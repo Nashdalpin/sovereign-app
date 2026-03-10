@@ -1,0 +1,14 @@
+{"sessionId":"59ed0e","location":"store.tsx:module","message":"store module evaluated","data":{},"hypothesisId":"H3","timestamp":1773154654348}
+{"sessionId":"59ed0e","location":"AppLayout.tsx:default","message":"AppLayout render","timestamp":1773154654429,"hypothesisId":"H5"}
+{"sessionId":"59ed0e","location":"store.tsx:FocoProvider","message":"FocoProvider render","data":{},"hypothesisId":"H2","timestamp":1773154654433}
+{"sessionId":"59ed0e","location":"AppLayout.tsx:AppLayoutContent","message":"AppLayoutContent render","timestamp":1773154654440,"hypothesisId":"H5"}
+{"sessionId":"59ed0e","location":"AppLayout.tsx:default","message":"AppLayout render","timestamp":1773154699614,"hypothesisId":"H5"}
+{"sessionId":"59ed0e","location":"store.tsx:FocoProvider","message":"FocoProvider render","data":{},"hypothesisId":"H2","timestamp":1773154699629}
+{"sessionId":"59ed0e","location":"AppLayout.tsx:AppLayoutContent","message":"AppLayoutContent render","timestamp":1773154699632,"hypothesisId":"H5"}
+{"sessionId":"59ed0e","location":"AppLayout.tsx:default","message":"AppLayout render","timestamp":1773155104892,"hypothesisId":"H5"}
+{"sessionId":"59ed0e","location":"store.tsx:FocoProvider","message":"FocoProvider render","data":{},"hypothesisId":"H2","timestamp":1773155104908}
+{"sessionId":"59ed0e","location":"AppLayout.tsx:AppLayoutContent","message":"AppLayoutContent render","timestamp":1773155104912,"hypothesisId":"H5"}
+{"sessionId":"59ed0e","location":"AppLayout.tsx:default","message":"AppLayout render","timestamp":1773155246669,"hypothesisId":"H5"}
+{"sessionId":"59ed0e","location":"AppLayout.tsx:AppLayoutContent","message":"AppLayoutContent render","timestamp":1773155246674,"hypothesisId":"H5"}
+{"sessionId":"59ed0e","location":"AppLayout.tsx:default","message":"AppLayout render","timestamp":1773155250266,"hypothesisId":"H5"}
+{"sessionId":"59ed0e","location":"AppLayout.tsx:AppLayoutContent","message":"AppLayoutContent render","timestamp":1773155250271,"hypothesisId":"H5"}
