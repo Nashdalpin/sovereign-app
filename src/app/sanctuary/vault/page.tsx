@@ -376,14 +376,14 @@ export default function SanctuaryVaultPage() {
                             try {
                               const result = await splitGoalIntoDailyTasks({ goal: asset.name });
                               if (result.error === 'QUOTA_EXCEEDED') {
-                                toast({ title: 'STRATEGIC BLACKOUT', description: 'Imperial Intelligence is overwhelmed. Wait 60 seconds before re-auditing.', variant: 'destructive' });
+                                toast({ title: 'STRATEGIC BLACKOUT', description: 'Imperial Intelligence is overwhelmed. Wait 60 seconds before re-auditing.', variant: 'elegant' });
                                 return;
                               }
                               if (result.dailyTasks) updateAssetTasks(asset.id, result.dailyTasks);
-                              else toast({ title: 'No directives generated', description: 'Try a more specific mandate name.', variant: 'destructive' });
+                              else toast({ title: 'No directives', description: 'Try a more specific mandate name.', variant: 'elegant' });
                             } catch (e) {
                               console.error('Error splitting goal into daily tasks:', e);
-                              toast({ title: 'SYSTEM FAILURE', description: 'Communication with the Strategic Core was severed.', variant: 'destructive' });
+                              toast({ title: 'Strategic Core', description: 'Connection unavailable. Try again later.', variant: 'elegant' });
                             } finally {
                               setBreakdownAssetId(null);
                             }

@@ -136,7 +136,7 @@ export function SovereignVoice() {
         toast({
           title,
           description: result.transcript,
-          variant: 'destructive',
+          variant: 'elegant',
         });
         showSystemNotification(title, result.transcript);
         if (result.audioUri && audioRef.current && mountedRef.current) {
@@ -152,27 +152,27 @@ export function SovereignVoice() {
           // User never sees "limit exceeded"; show the directive (transcript or fallback) instead.
           if (quotaTranscript) {
             const title = event === 'background_return' || event === 'late_open' ? 'INTERROGATION' : 'DIRECTIVE';
-            toast({ title, description: quotaTranscript, variant: 'destructive' });
+            toast({ title, description: quotaTranscript, variant: 'elegant' });
             showSystemNotification(title, quotaTranscript);
           } else if (shouldShowQuotaToast()) {
             markQuotaToastShown();
             const fallbackDirective = 'Focus. Execute. Now.';
-            toast({ title: 'DIRECTIVE', description: fallbackDirective, variant: 'destructive' });
+            toast({ title: 'DIRECTIVE', description: fallbackDirective, variant: 'elegant' });
             showSystemNotification('DIRECTIVE', fallbackDirective);
           }
         } else {
           const isNoAudio = result.error === 'AUDIO_GENERATION_FAILED' || result.error === 'NO_AUDIO_GENERATED';
           const message = result.error === 'MISSING_API_KEY'
-            ? 'Falta GEMINI_API_KEY no servidor. Adiciona em .env ou .env.local.'
+            ? 'Diretiva indisponível.'
             : result.error === 'NO_TEXT_GENERATED'
-              ? 'Não foi possível gerar a diretiva.'
+              ? 'Diretiva indisponível.'
               : isNoAudio
-                ? (result as { transcript?: string }).transcript ?? 'Diretiva gerada sem áudio.'
-                : 'SGT falhou. Tenta de novo.';
+                ? (result as { transcript?: string }).transcript ?? 'Diretiva sem áudio.'
+                : 'Tenta novamente mais tarde.';
           toast({
-            title: isNoAudio ? 'Diretiva (sem áudio)' : 'SGT Error',
+            title: isNoAudio ? 'DIRECTIVE' : 'DIRECTIVE',
             description: message,
-            variant: 'destructive',
+            variant: 'elegant',
           });
         }
       }
@@ -184,11 +184,11 @@ export function SovereignVoice() {
       } else {
         if (isTimeout) markTimeoutToastShown();
         toast({
-          title: 'SGT Error',
+          title: 'DIRECTIVE',
           description: isTimeout
-            ? 'Demorou mais de 15s. Verifica a ligação e a API key (GEMINI_API_KEY em .env).'
-            : 'Ocorreu um erro. Tenta de novo.',
-          variant: 'destructive',
+            ? 'A resposta demorou. Tenta novamente.'
+            : 'Diretiva indisponível. Tenta mais tarde.',
+          variant: 'elegant',
         });
       }
     } finally {

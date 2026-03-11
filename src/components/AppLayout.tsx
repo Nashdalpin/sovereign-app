@@ -34,9 +34,9 @@ export function AppLayoutContent({ children }: { children: React.ReactNode }) {
       if (Date.now() - lastApiOfflineToastAt.current < API_OFFLINE_TOAST_COOLDOWN_MS) return;
       lastApiOfflineToastAt.current = Date.now();
       toast({
-        title: 'Sem ligação ao servidor',
-        description: 'Verifica a rede ou se o servidor está a correr. Os dados locais serão usados quando possível.',
-        variant: 'destructive',
+        title: 'Sem ligação',
+        description: 'Os dados locais serão usados quando possível.',
+        variant: 'elegant',
       });
     };
     window.addEventListener('sovereign:api-offline', onApiOffline);

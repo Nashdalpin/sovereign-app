@@ -55,13 +55,13 @@ export default function PresenceAltar() {
   const handleToggleFocus = () => {
     if (!isFocusing) {
       if (!activeAssetId) {
-        toast({ title: "MANDATE REQUIRED", description: "Select a mandate to activate Presence.", variant: "destructive" });
+        toast({ title: "MANDATE REQUIRED", description: "Select a mandate to activate Presence.", variant: "elegant" });
         return;
       }
       toggleFocus(activeAssetId);
     } else {
       toggleFocus();
-      toast({ title: "MANDATE SEALED", description: "Your focus capital has been secured." });
+      toast({ title: "MANDATE SEALED", description: "Your focus capital has been secured.", variant: "elegant" });
     }
   };
 

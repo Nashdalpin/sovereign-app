@@ -225,7 +225,7 @@ export default function LedgerPage() {
     setDebriefError(null);
     const showError = (msg: string) => {
       setDebriefError(msg);
-      toast({ title: 'Council', description: msg, variant: 'destructive' });
+      toast({ title: 'Council', description: msg, variant: 'elegant' });
     };
     try {
       const totalWeekHours = Number(weeklyStats.totalWeekHours);
