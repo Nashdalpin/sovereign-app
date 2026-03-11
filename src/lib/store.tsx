@@ -199,9 +199,26 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
+        const dateStr = new Date().toDateString();
+        const url = `/api/me/data?date=${encodeURIComponent(dateStr)}`;
+        const maxAttempts = 3;
+        const retryDelayMs = 1000;
+        let res: Response | null = null;
+        let lastErr: unknown;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            res = await fetch(url);
+            if (res.ok) break;
+            lastErr = new Error(`HTTP ${res.status}`);
+          } catch (e) {
+            lastErr = e;
+          }
+          if (attempt < maxAttempts) {
+            await new Promise((r) => setTimeout(r, retryDelayMs));
+          }
+        }
         try {
-          const res = await fetch(`/api/me/data?date=${encodeURIComponent(new Date().toDateString())}`);
-          if (res.ok) {
+          if (res?.ok) {
             const data = await res.json();
             setAssets(data.assets ?? []);
             setSessionLogs(data.sessionLogs ?? []);
@@ -223,9 +240,17 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
             setCompletedBlockIndices(data.appState?.completedBlockIndices ?? []);
             setCurrentBlockIndexState(data.appState?.currentBlockIndex ?? null);
             setCurrentBlockSuggestedMinutes(data.appState?.currentBlockSuggestedMinutes ?? null);
+          } else if (lastErr) {
+            console.error('Failed to load from API after retries', lastErr);
+            if (typeof window !== 'undefined' && lastErr instanceof TypeError && (lastErr as Error).message?.toLowerCase().includes('fetch')) {
+              window.dispatchEvent(new CustomEvent('sovereign:api-offline', { detail: { source: 'initial' } }));
+            }
           }
         } catch (e) {
           console.error('Failed to load from API', e);
+          if (typeof window !== 'undefined' && e instanceof TypeError && (e as Error).message?.toLowerCase().includes('fetch')) {
+            window.dispatchEvent(new CustomEvent('sovereign:api-offline', { detail: { source: 'initial' } }));
+          }
         }
         initialLoadFromApiDone.current = true;
       } else {
@@ -293,7 +318,12 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      }).catch((e) => console.error('Sync failed', e));
+      }).catch((e) => {
+        console.error('Sync failed', e);
+        if (typeof window !== 'undefined' && e instanceof TypeError && (e as Error).message?.toLowerCase().includes('fetch')) {
+          window.dispatchEvent(new CustomEvent('sovereign:api-offline', { detail: { source: 'sync' } }));
+        }
+      });
     }, 1500);
     return () => { if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current); };
   }, [isHydrated, userId, assets, sessionLogs, lifeTracker, vitals, ritualDefinitions, completedBlockIndices, currentBlockIndex, currentBlockSuggestedMinutes, pillarRitualsConfig]);

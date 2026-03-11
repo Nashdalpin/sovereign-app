@@ -67,7 +67,7 @@ export default function PresenceAltar() {
 
   if (!isHydrated) {
     return (
-      <div className="max-w-screen-sm mx-auto px-8 h-[60vh] flex items-center justify-center">
+      <div className="max-w-screen-sm mx-auto px-4 sm:px-6 md:px-8 h-[60vh] flex items-center justify-center">
         <p className="text-[9px] font-black uppercase tracking-[1em] opacity-20 animate-pulse">
           Initializing Presence Ritual...
         </p>
@@ -77,10 +77,10 @@ export default function PresenceAltar() {
 
   if (assets.length === 0) {
     return (
-      <div className="max-w-screen-sm mx-auto h-[70vh] flex flex-col items-center justify-center px-10 text-center space-y-16 animate-in fade-in duration-1000">
+      <div className="max-w-screen-sm mx-auto h-[70vh] flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 text-center space-y-12 sm:space-y-16 animate-in fade-in duration-1000">
         <header className="space-y-6">
           <p className="text-[10px] font-black uppercase tracking-[1.2em] opacity-20">Portfolio Void</p>
-          <h1 className="text-6xl luxury-text">Empty.</h1>
+          <h1 className="text-5xl sm:text-6xl luxury-text">Empty.</h1>
         </header>
         <Link href="/sanctuary/vault" className="w-full">
           <button className="w-full h-24 rounded-full bg-foreground text-background text-[11px] font-black uppercase tracking-[1em] transition-all luxury-shadow border border-white/5">
@@ -92,11 +92,11 @@ export default function PresenceAltar() {
   }
 
   return (
-    <div className="max-w-screen-sm mx-auto px-8 space-y-20 animate-in fade-in duration-1000">
-      <header className="text-center space-y-10">
+    <div className="max-w-screen-sm mx-auto px-4 sm:px-6 md:px-8 space-y-10 sm:space-y-16 animate-in fade-in duration-1000">
+      <header className="text-center space-y-8 sm:space-y-10">
         <div className="space-y-4">
           <p className="text-[10px] font-black uppercase tracking-[1.5em] opacity-20 gold-glow">Presence Ritual</p>
-          <h1 className="text-7xl luxury-text">Ignite.</h1>
+          <h1 className="text-5xl sm:text-6xl md:text-7xl luxury-text">Ignite.</h1>
           {blockSession && (
             <p className="text-[9px] font-black uppercase tracking-[0.6em] opacity-50">
               Block {blockSession.blockIndex + 1} of {blockSession.totalBlocks} · {blockSession.suggestedMinutes} min
@@ -118,7 +118,7 @@ export default function PresenceAltar() {
               {isFocusing ? activeAsset?.name : (isCritical ? 'Emergency Alpha' : 'Alpha Mandate')}
             </p>
             <div className={cn(
-              "text-[10rem] font-light tracking-tighter tabular-nums leading-none luxury-text transition-all duration-1000",
+              "text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-light tracking-tighter tabular-nums leading-none luxury-text transition-all duration-1000",
               isFocusing ? "text-primary gold-glow" : "opacity-10"
             )}>
               {sessionDisplayTime}
@@ -138,7 +138,7 @@ export default function PresenceAltar() {
                 </button>
               </DropdownMenuTrigger>
               {!isCritical && (
-                <DropdownMenuContent align="center" className="rounded-[3rem] border-white/10 p-3 min-w-[320px] luxury-blur luxury-shadow bg-card/95 backdrop-blur-3xl">
+                <DropdownMenuContent align="center" className="rounded-[3rem] border-white/10 p-3 w-[min(100vw-2rem,320px)] max-w-[320px] luxury-blur luxury-shadow bg-card/95 backdrop-blur-3xl">
                   {assets.map(asset => (
                     <DropdownMenuItem 
                       key={asset.id} 
@@ -155,12 +155,12 @@ export default function PresenceAltar() {
         </div>
       </header>
 
-      <section className="flex justify-center py-6">
+      <section className="flex justify-center py-4 sm:py-6">
         <button 
           onClick={handleToggleFocus}
           aria-label={isFocusing ? 'SEAL – end focus session and log time' : 'IGNITE – start focus session'}
           className={cn(
-            "w-64 h-64 rounded-full flex flex-col items-center justify-center gap-8 transition-all duration-1000 luxury-shadow relative group",
+            "w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 rounded-full flex flex-col items-center justify-center gap-4 sm:gap-8 transition-all duration-1000 luxury-shadow relative group",
             isFocusing 
               ? "bg-primary/5 border-[1px] border-primary/50 shadow-[0_0_100px_rgba(212,175,55,0.2)] scale-110" 
               : "bg-foreground/5 border-[1px] border-white/10 hover:border-white/20 active:scale-95"
@@ -172,12 +172,12 @@ export default function PresenceAltar() {
           )} />
           
           <div className={cn(
-            "w-24 h-24 rounded-full border-[1.5px] flex items-center justify-center transition-all duration-1000 z-10",
+            "w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full border-[1.5px] flex items-center justify-center transition-all duration-1000 z-10",
             isFocusing 
               ? "border-primary text-primary shadow-[0_0_40px_rgba(212,175,55,0.5)] bg-primary/15" 
               : "border-white/20 text-white/30"
           )}>
-            {isFocusing ? <Crown size={36} strokeWidth={1.5} /> : <Shield size={36} strokeWidth={1} />}
+            {isFocusing ? <Crown size={32} strokeWidth={1.5} /> : <Shield size={32} strokeWidth={1} />}
           </div>
           
           <div className="flex flex-col items-center gap-2 z-10">

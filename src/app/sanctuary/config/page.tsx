@@ -49,7 +49,7 @@ export default function SanctuaryConfigPage() {
 
   if (!isHydrated) {
     return (
-      <div className="max-w-screen-sm mx-auto px-8 h-[60vh] flex items-center justify-center">
+      <div className="max-w-screen-sm mx-auto px-4 sm:px-6 md:px-8 h-[60vh] flex items-center justify-center">
         <p className="text-[9px] font-black uppercase tracking-[1em] opacity-20 animate-pulse">
           Initializing...
         </p>
@@ -58,7 +58,7 @@ export default function SanctuaryConfigPage() {
   }
 
   return (
-    <div className="max-w-screen-sm mx-auto px-6 space-y-12 animate-in fade-in duration-1000">
+    <div className="max-w-screen-sm mx-auto px-4 sm:px-6 md:px-8 space-y-12 animate-in fade-in duration-1000">
       <header className="space-y-4">
         <Link
           href="/sanctuary"

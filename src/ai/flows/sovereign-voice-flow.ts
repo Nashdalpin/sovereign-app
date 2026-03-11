@@ -104,16 +104,23 @@ const sovereignVoiceFlow = ai.defineFlow(
           prompt: generatedText,
         });
 
-        if (!media) {
-           return { transcript: generatedText, error: 'NO_AUDIO_GENERATED' };
+        if (!media?.url || typeof media.url !== 'string' || !media.url.includes(',')) {
+          return { transcript: generatedText, error: 'NO_AUDIO_GENERATED' };
         }
 
-        const audioBuffer = Buffer.from(
-          media.url.substring(media.url.indexOf(',') + 1),
-          'base64'
-        );
+        const base64Payload = media.url.substring(media.url.indexOf(',') + 1);
+        const audioBuffer = Buffer.from(base64Payload, 'base64');
 
-        const wavBase64 = await toWav(audioBuffer);
+        let wavBase64: string;
+        try {
+          wavBase64 = await toWav(audioBuffer);
+        } catch (_) {
+          return { transcript: generatedText, error: 'NO_AUDIO_GENERATED' };
+        }
+
+        if (!wavBase64) {
+          return { transcript: generatedText, error: 'NO_AUDIO_GENERATED' };
+        }
 
         return {
           audioUri: 'data:audio/wav;base64,' + wavBase64,

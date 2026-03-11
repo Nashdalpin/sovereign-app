@@ -1,12 +1,13 @@
 
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Crown, Compass, ShieldCheck, Sun, Moon, ChartNoAxesCombined, LogOut, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
 import { FocoProvider } from "@/lib/store";
 import { SovereignVoice } from "@/components/SovereignVoice";
 import { createClient } from '@/lib/supabase/client';
@@ -18,11 +19,29 @@ const NavItems = [
   { icon: ChartNoAxesCombined, label: 'Progress', href: '/progress' },
 ];
 
+const API_OFFLINE_TOAST_COOLDOWN_MS = 30_000;
+
 export function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { toast } = useToast();
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [mounted, setMounted] = useState(false);
+  const lastApiOfflineToastAt = useRef<number>(0);
+
+  useEffect(() => {
+    const onApiOffline = () => {
+      if (Date.now() - lastApiOfflineToastAt.current < API_OFFLINE_TOAST_COOLDOWN_MS) return;
+      lastApiOfflineToastAt.current = Date.now();
+      toast({
+        title: 'Sem ligação ao servidor',
+        description: 'Verifica a rede ou se o servidor está a correr. Os dados locais serão usados quando possível.',
+        variant: 'destructive',
+      });
+    };
+    window.addEventListener('sovereign:api-offline', onApiOffline);
+    return () => window.removeEventListener('sovereign:api-offline', onApiOffline);
+  }, [toast]);
 
   useEffect(() => {
     setMounted(true);
@@ -66,7 +85,7 @@ export function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-body selection:bg-primary/30">
-      <header className="h-16 flex items-center justify-between px-6 fixed top-0 w-full z-40 bg-background/30 backdrop-blur-xl border-b border-white/5">
+      <header className="min-h-16 h-16 flex items-center justify-between px-6 fixed top-0 w-full z-40 bg-background/30 backdrop-blur-xl border-b border-white/5 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center gap-4">
           <span className="text-[8px] font-black uppercase tracking-[0.8em] opacity-30 gold-glow">Sovereign</span>
           <SovereignVoice />
@@ -83,9 +102,9 @@ export function AppLayoutContent({ children }: { children: React.ReactNode }) {
           </button>
         </div>
       </header>
-      <main className="relative z-10 pt-20 pb-32">{children}</main>
+      <main className="relative z-10 pt-20 pb-[calc(8rem+env(safe-area-inset-bottom,0px))]">{children}</main>
       
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[94%] max-w-[340px]">
+      <nav className="fixed left-1/2 -translate-x-1/2 z-50 w-[94%] max-w-[340px] bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
         <div className="luxury-blur rounded-full luxury-shadow flex justify-around items-center h-16 px-2 border border-white/10 backdrop-blur-3xl bg-black/50">
           {NavItems.map((item) => {
             const isActive = item.href === '/' ? pathname === '/' : pathname === item.href || (item.href === '/sanctuary' && pathname.startsWith('/sanctuary'));

@@ -27,7 +27,7 @@ export default function EmpireDashboard() {
 
   if (!isHydrated) {
     return (
-      <div className="max-w-screen-sm mx-auto px-8 h-[60vh] flex items-center justify-center">
+      <div className="max-w-screen-sm mx-auto px-4 sm:px-6 md:px-8 h-[60vh] flex items-center justify-center">
         <p className="text-[9px] font-black uppercase tracking-[1em] opacity-20 animate-pulse">
           Initializing Command...
         </p>
@@ -36,7 +36,7 @@ export default function EmpireDashboard() {
   }
 
   return (
-    <div className="max-w-screen-sm mx-auto px-8 space-y-10 animate-in fade-in duration-1000">
+    <div className="max-w-screen-sm mx-auto px-4 sm:px-6 md:px-8 space-y-10 animate-in fade-in duration-1000">
       <header className="space-y-4 text-center">
         <p className="text-[10px] font-black uppercase tracking-[1.2em] opacity-20 gold-glow">The Command</p>
         <h1 className="text-5xl luxury-text">Empire.</h1>
@@ -56,7 +56,7 @@ export default function EmpireDashboard() {
         <div className="text-center space-y-2">
           <p className="text-[11px] font-bold uppercase tracking-[0.8em] opacity-20">Temporal Equity Invested</p>
           <p className={cn(
-            "text-[7rem] font-light tracking-tighter tabular-nums leading-none luxury-text transition-all duration-1000",
+            "text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-light tracking-tighter tabular-nums leading-none luxury-text transition-all duration-1000",
             focusHoursToday > 0 ? "text-primary gold-glow" : "opacity-10"
           )}>
             {focusHoursToday.toFixed(1)}

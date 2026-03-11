@@ -12,6 +12,9 @@ const LATE_OPEN_FOCUS_MAX_HOURS = 0.5;
 const BACKGROUND_DRILL_NOTIFICATION_MINUTES = 10;
 const MIN_MINUTES_AWAY_TO_TRIGGER = 0.5;
 const SGT_REQUEST_TIMEOUT_MS = 15_000;
+const SGT_QUOTA_TOAST_COOLDOWN_MS = 5 * 60 * 1000; // show quota toast at most once per 5 min
+const SGT_TIMEOUT_TOAST_COOLDOWN_MS = 5 * 60 * 1000; // same for timeout toast
+const SGT_MODE_CHANGE_DEBOUNCE_MS = 3000; // min interval between mode_change triggers
 
 // System notifications (Notification API) show pop-ups when the app is in foreground or when user returns.
 // When tab is hidden with SEAL on, a timer fires after 10 min to show a drill notification (browser may throttle).
@@ -31,6 +34,34 @@ function getLateOpenFiredDate(): string | null {
 function setLateOpenFiredDate(dateStr: string) {
   if (typeof window === 'undefined') return;
   localStorage.setItem('sgt_late_open_fired_date', dateStr);
+}
+
+function shouldShowQuotaToast(): boolean {
+  if (typeof window === 'undefined') return true;
+  const raw = sessionStorage.getItem('sgt_quota_toast_at');
+  if (!raw) return true;
+  const at = Number(raw);
+  if (Number.isNaN(at)) return true;
+  return Date.now() - at > SGT_QUOTA_TOAST_COOLDOWN_MS;
+}
+
+function markQuotaToastShown() {
+  if (typeof window === 'undefined') return;
+  sessionStorage.setItem('sgt_quota_toast_at', String(Date.now()));
+}
+
+function shouldShowTimeoutToast(): boolean {
+  if (typeof window === 'undefined') return true;
+  const raw = sessionStorage.getItem('sgt_timeout_toast_at');
+  if (!raw) return true;
+  const at = Number(raw);
+  if (Number.isNaN(at)) return true;
+  return Date.now() - at > SGT_TIMEOUT_TOAST_COOLDOWN_MS;
+}
+
+function markTimeoutToastShown() {
+  if (typeof window === 'undefined') return;
+  sessionStorage.setItem('sgt_timeout_toast_at', String(Date.now()));
 }
 
 export function SovereignVoice() {
@@ -57,6 +88,7 @@ export function SovereignVoice() {
   const backgroundDrillTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lateOpenFiredRef = useRef(false);
   const mountedRef = useRef(true);
+  const lastModeChangeAtRef = useRef<number>(0);
 
   lifeTrackerRef.current = lifeTracker;
 
@@ -107,37 +139,58 @@ export function SovereignVoice() {
           variant: 'destructive',
         });
         showSystemNotification(title, result.transcript);
-        if (result.audioUri && audioRef.current) {
+        if (result.audioUri && audioRef.current && mountedRef.current) {
           audioRef.current.src = result.audioUri;
           audioRef.current.play().catch((e) => console.warn('Audio play blocked', e));
-          setIsPlaying(true);
+          if (mountedRef.current) setIsPlaying(true);
         }
       } else if (result.error) {
-        const message = result.error === 'MISSING_API_KEY'
-          ? 'Falta GEMINI_API_KEY no servidor. Adiciona em .env ou .env.local.'
-          : result.error === 'QUOTA_EXCEEDED_TEXT' || result.error === 'QUOTA_EXCEEDED_AUDIO'
-            ? 'Limite de uso da API excedido. Tenta mais tarde.'
+        const isQuota = result.error === 'QUOTA_EXCEEDED_TEXT' || result.error === 'QUOTA_EXCEEDED_AUDIO';
+        const quotaTranscript = (result as { transcript?: string }).transcript;
+
+        if (isQuota) {
+          // User never sees "limit exceeded"; show the directive (transcript or fallback) instead.
+          if (quotaTranscript) {
+            const title = event === 'background_return' || event === 'late_open' ? 'INTERROGATION' : 'DIRECTIVE';
+            toast({ title, description: quotaTranscript, variant: 'destructive' });
+            showSystemNotification(title, quotaTranscript);
+          } else if (shouldShowQuotaToast()) {
+            markQuotaToastShown();
+            const fallbackDirective = 'Focus. Execute. Now.';
+            toast({ title: 'DIRECTIVE', description: fallbackDirective, variant: 'destructive' });
+            showSystemNotification('DIRECTIVE', fallbackDirective);
+          }
+        } else {
+          const isNoAudio = result.error === 'AUDIO_GENERATION_FAILED' || result.error === 'NO_AUDIO_GENERATED';
+          const message = result.error === 'MISSING_API_KEY'
+            ? 'Falta GEMINI_API_KEY no servidor. Adiciona em .env ou .env.local.'
             : result.error === 'NO_TEXT_GENERATED'
               ? 'Não foi possível gerar a diretiva.'
-              : result.error === 'AUDIO_GENERATION_FAILED' || result.error === 'NO_AUDIO_GENERATED'
-                ? 'Diretiva gerada sem áudio.'
+              : isNoAudio
+                ? (result as { transcript?: string }).transcript ?? 'Diretiva gerada sem áudio.'
                 : 'SGT falhou. Tenta de novo.';
-        toast({
-          title: 'SGT Error',
-          description: message,
-          variant: 'destructive',
-        });
+          toast({
+            title: isNoAudio ? 'Diretiva (sem áudio)' : 'SGT Error',
+            description: message,
+            variant: 'destructive',
+          });
+        }
       }
     } catch (e) {
       const isTimeout = e instanceof Error && e.message === 'TIMEOUT';
       console.error('Sovereign Voice Error', e);
-      toast({
-        title: 'SGT Error',
-        description: isTimeout
-          ? 'Demorou mais de 15s. Verifica a ligação e a API key (GEMINI_API_KEY em .env).'
-          : 'Ocorreu um erro. Tenta de novo.',
-        variant: 'destructive',
-      });
+      if (isTimeout && !shouldShowTimeoutToast()) {
+        // Throttle timeout toast
+      } else {
+        if (isTimeout) markTimeoutToastShown();
+        toast({
+          title: 'SGT Error',
+          description: isTimeout
+            ? 'Demorou mais de 15s. Verifica a ligação e a API key (GEMINI_API_KEY em .env).'
+            : 'Ocorreu um erro. Tenta de novo.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       if (mountedRef.current) setIsLoading(false);
     }
@@ -209,6 +262,9 @@ export function SovereignVoice() {
 
   useEffect(() => {
     if (!isInitialized) return;
+    const now = Date.now();
+    if (now - lastModeChangeAtRef.current < SGT_MODE_CHANGE_DEBOUNCE_MS) return;
+    lastModeChangeAtRef.current = now;
     triggerVoice('mode_change');
   }, [isInitialized, lifeTracker.activeMode, triggerVoice]);
 
@@ -238,15 +294,19 @@ export function SovereignVoice() {
       ) : (
         <button
           onClick={() => triggerVoice('manual')}
-          aria-label="Trigger Sovereign Guard Tower voice briefing"
+          aria-label={isLoading ? 'A carregar voz SGT…' : 'Trigger Sovereign Guard Tower voice briefing'}
+          aria-busy={isLoading}
+          disabled={isLoading}
           className={cn(
             'w-8 h-8 rounded-full border flex items-center justify-center transition-all duration-700',
             isPlaying
               ? 'scale-110 border-destructive text-destructive bg-destructive/5 shadow-[0_0_20px_rgba(255,0,0,0.1)]'
-              : 'opacity-30 hover:opacity-100 border-white/10 hover:border-primary/40'
+              : isLoading
+                ? 'opacity-70 border-primary/30 cursor-wait'
+                : 'opacity-30 hover:opacity-100 border-white/10 hover:border-primary/40'
           )}
         >
-          {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />}
+          {isLoading ? <Loader2 size={12} className="animate-spin" aria-hidden /> : <Eye size={12} />}
         </button>
       )}
     </div>
