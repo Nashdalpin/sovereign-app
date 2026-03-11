@@ -4,10 +4,9 @@ import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useFoco, Pillar, Priority } from '@/lib/store';
 import { RITUAL_ICON_MAP } from '@/lib/ritual-icons';
-import { splitGoalIntoDailyTasks } from '@/ai/flows/split-goal-into-daily-tasks';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Briefcase, Coins, Heart, User, Plus, Trash2, Gem, AlertTriangle, Zap, ArrowLeft, Settings, Sparkles, Loader2
+  Briefcase, Coins, Heart, User, Plus, Trash2, Gem, AlertTriangle, Zap, ArrowLeft, Settings, ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
@@ -15,13 +14,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { PILLAR_CONFIG } from '@/lib/constants';
 
 export default function SanctuaryVaultPage() {
   const { assets, addAsset, deleteAsset, updateAsset, isHydrated, assetAnalytics, updateAssetCriticalRituals, getDefaultCriticalRitualsForPillar, ritualDefinitions, updateAssetTasks } = useFoco();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
-  const [breakdownAssetId, setBreakdownAssetId] = useState<string | null>(null);
   const [newAsset, setNewAsset] = useState<{ name: string; category: Pillar; priority: Priority; target: string; horizon: string }>({
     name: '', category: 'capital', priority: 'medium', target: '', horizon: '1'
   });
@@ -163,42 +162,42 @@ export default function SanctuaryVaultPage() {
                 <Plus size={24} />
               </button>
             </DialogTrigger>
-            <DialogContent className="rounded-[3rem] border-white/10 luxury-blur p-8 bg-black/95 backdrop-blur-3xl max-w-[94vw] sm:max-w-lg mx-auto overflow-hidden">
-              <DialogHeader className="text-center space-y-4 mb-8">
+            <DialogContent className="rounded-[3rem] border border-primary/20 luxury-blur p-6 sm:p-8 bg-card/95 backdrop-blur-3xl max-w-[94vw] sm:max-w-lg mx-auto overflow-y-auto max-h-[85dvh]">
+              <DialogHeader className="text-center space-y-4 mb-6 sm:mb-8">
                 <DialogTitle className="text-4xl luxury-text">Forge.</DialogTitle>
-                <DialogDescription className="text-[9px] uppercase tracking-[0.5em] opacity-30">Establish New Strategic Mandate</DialogDescription>
+                <DialogDescription className="text-[9px] uppercase tracking-[0.5em] text-muted-foreground">Establish New Strategic Mandate</DialogDescription>
               </DialogHeader>
 
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase tracking-[0.5em] opacity-20 ml-6">Mandate Identifier</Label>
+                  <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground truncate block">Mandate Identifier</Label>
                   <Input
                     value={newAsset.name}
                     placeholder="E.g., Quantum Growth"
-                    className="rounded-full h-16 bg-white/[0.04] border-none px-8 text-base placeholder:opacity-10 focus:ring-1 focus:ring-primary/20"
+                    className="rounded-full h-12 sm:h-14 bg-muted/50 border border-white/10 dark:border-white/10 px-6 sm:px-8 text-base placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/30"
                     onChange={(e) => setNewAsset({ ...newAsset, name: e.target.value })}
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-bold uppercase tracking-[0.5em] opacity-20 ml-6">Pillar</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2 min-w-0">
+                    <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground truncate block">Pillar</Label>
                     <Select value={newAsset.category} onValueChange={(v) => setNewAsset({ ...newAsset, category: v as Pillar })}>
-                      <SelectTrigger className="rounded-full h-16 bg-white/[0.04] border-none px-6 text-[10px] font-black uppercase tracking-[0.2em]">
+                      <SelectTrigger className="rounded-full h-12 sm:h-14 bg-muted/50 border border-white/10 min-w-0 [&>span]:truncate px-4 sm:px-6 text-[10px] font-black uppercase tracking-[0.2em]">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="rounded-[2.5rem] luxury-blur border-white/10 bg-black/95">
+                      <SelectContent className="rounded-[2.5rem] luxury-blur border border-white/10 border-primary/10 bg-card">
                         {PILLAR_CONFIG.map(p => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-bold uppercase tracking-[0.5em] opacity-20 ml-6">Priority</Label>
+                  <div className="space-y-2 min-w-0">
+                    <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground truncate block">Priority</Label>
                     <Select value={newAsset.priority} onValueChange={(v) => setNewAsset({ ...newAsset, priority: v as Priority })}>
-                      <SelectTrigger className="rounded-full h-16 bg-white/[0.04] border-none px-6 text-[10px] font-black uppercase tracking-[0.2em]">
+                      <SelectTrigger className="rounded-full h-12 sm:h-14 bg-muted/50 border border-white/10 min-w-0 [&>span]:truncate px-4 sm:px-6 text-[10px] font-black uppercase tracking-[0.2em]">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="rounded-[2.5rem] luxury-blur border-white/10 bg-black/95">
+                      <SelectContent className="rounded-[2.5rem] luxury-blur border border-white/10 border-primary/10 bg-card">
                         <SelectItem value="high" className="text-destructive">Alpha</SelectItem>
                         <SelectItem value="medium" className="text-primary">Beta</SelectItem>
                         <SelectItem value="low">Gamma</SelectItem>
@@ -207,22 +206,22 @@ export default function SanctuaryVaultPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-bold uppercase tracking-[0.5em] opacity-20 ml-6">Target (Hours)</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2 min-w-0">
+                    <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground truncate block">Target (Hours)</Label>
                     <Input
                       type="number" value={newAsset.target} placeholder="1000"
-                      className="rounded-full h-16 bg-white/[0.04] border-none px-8 text-base placeholder:opacity-10"
+                      className="rounded-full h-12 sm:h-14 bg-muted/50 border border-white/10 px-6 sm:px-8 text-base placeholder:text-muted-foreground"
                       onChange={(e) => setNewAsset({ ...newAsset, target: e.target.value })}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-bold uppercase tracking-[0.5em] opacity-20 ml-6">Horizon</Label>
+                  <div className="space-y-2 min-w-0">
+                    <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground truncate block">Horizon</Label>
                     <Select value={newAsset.horizon} onValueChange={(v) => setNewAsset({ ...newAsset, horizon: v })}>
-                      <SelectTrigger className="rounded-full h-16 bg-white/[0.04] border-none px-6 text-[10px] font-black uppercase tracking-[0.2em]">
+                      <SelectTrigger className="rounded-full h-12 sm:h-14 bg-muted/50 border border-white/10 min-w-0 [&>span]:truncate px-4 sm:px-6 text-[10px] font-black uppercase tracking-[0.2em]">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="rounded-[2.5rem] luxury-blur border-white/10 bg-black/95">
+                      <SelectContent className="rounded-[2.5rem] luxury-blur border border-white/10 border-primary/10 bg-card">
                         <SelectItem value="1">1 Year</SelectItem>
                         <SelectItem value="5">5 Years</SelectItem>
                         <SelectItem value="10">10 Years</SelectItem>
@@ -335,67 +334,45 @@ export default function SanctuaryVaultPage() {
                         </div>
                       )}
 
-                      <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
-                        <p className="text-[8px] font-black uppercase tracking-[0.4em] opacity-30">Critical rituals for this mandate</p>
-                        <div className="flex flex-wrap gap-4">
-                          {ritualDefinitions.map((ritual) => {
-                            const IconComp = RITUAL_ICON_MAP[ritual.icon];
-                            const effectiveRituals = asset.criticalRituals ?? getDefaultCriticalRitualsForPillar(asset.category);
-                            const checked = effectiveRituals.includes(ritual.id);
-                            return (
-                              <label
-                                key={ritual.id}
-                                className={cn(
-                                  "flex items-center gap-2 cursor-pointer rounded-full px-4 py-2 border transition-all",
-                                  checked ? "border-primary/40 bg-primary/5" : "border-white/5 opacity-60 hover:opacity-100"
-                                )}
-                              >
-                                <Checkbox
-                                  checked={checked}
-                                  onCheckedChange={() => {
-                                    const next = checked
-                                      ? effectiveRituals.filter((r) => r !== ritual.id)
-                                      : [...effectiveRituals, ritual.id];
-                                    updateAssetCriticalRituals(asset.id, next);
-                                  }}
-                                  className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                                />
-                                {IconComp && <IconComp size={12} className="opacity-60" />}
-                                <span className="text-[9px] font-bold uppercase tracking-wider">{ritual.label}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div className="mt-4 pt-4 border-t border-white/5">
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            setBreakdownAssetId(asset.id);
-                            try {
-                              const result = await splitGoalIntoDailyTasks({ goal: asset.name });
-                              if (result.error === 'QUOTA_EXCEEDED') {
-                                toast({ title: 'STRATEGIC BLACKOUT', description: 'Imperial Intelligence is overwhelmed. Wait 60 seconds before re-auditing.', variant: 'elegant' });
-                                return;
-                              }
-                              if (result.dailyTasks) updateAssetTasks(asset.id, result.dailyTasks);
-                              else toast({ title: 'No directives', description: 'Try a more specific mandate name.', variant: 'elegant' });
-                            } catch (e) {
-                              console.error('Error splitting goal into daily tasks:', e);
-                              toast({ title: 'Strategic Core', description: 'Connection unavailable. Try again later.', variant: 'elegant' });
-                            } finally {
-                              setBreakdownAssetId(null);
-                            }
-                          }}
-                          disabled={breakdownAssetId !== null}
-                          className="w-full flex items-center justify-center gap-2 py-3 rounded-full border border-white/10 hover:border-primary/40 hover:bg-primary/5 text-[9px] font-black uppercase tracking-wider transition-all disabled:opacity-50"
-                          aria-label="Break this mandate into daily directives"
-                        >
-                          {breakdownAssetId === asset.id ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                          Break into directives
-                        </button>
-                      </div>
+                      <Collapsible defaultOpen={false} className="group">
+                        <CollapsibleTrigger className="mt-4 pt-4 border-t border-white/5 w-full flex items-center justify-between text-left hover:opacity-90 transition-opacity">
+                          <span className="text-[8px] font-black uppercase tracking-[0.4em] opacity-50">
+                            Critical rituals ({(asset.criticalRituals ?? getDefaultCriticalRitualsForPillar(asset.category)).length})
+                          </span>
+                          <ChevronDown size={12} className="opacity-50 transition-transform group-data-[state=open]:rotate-180" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="flex flex-wrap gap-2 pt-3">
+                            {ritualDefinitions.map((ritual) => {
+                              const IconComp = RITUAL_ICON_MAP[ritual.icon];
+                              const effectiveRituals = asset.criticalRituals ?? getDefaultCriticalRitualsForPillar(asset.category);
+                              const checked = effectiveRituals.includes(ritual.id);
+                              return (
+                                <label
+                                  key={ritual.id}
+                                  className={cn(
+                                    "flex items-center gap-1.5 cursor-pointer rounded-full px-3 py-1.5 border transition-all",
+                                    checked ? "border-primary/40 bg-primary/5" : "border-white/10 opacity-70 hover:opacity-100"
+                                  )}
+                                >
+                                  <Checkbox
+                                    checked={checked}
+                                    onCheckedChange={() => {
+                                      const next = checked
+                                        ? effectiveRituals.filter((r) => r !== ritual.id)
+                                        : [...effectiveRituals, ritual.id];
+                                      updateAssetCriticalRituals(asset.id, next);
+                                    }}
+                                    className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary h-3.5 w-3.5"
+                                  />
+                                  {IconComp && <IconComp size={10} className="opacity-70 shrink-0" />}
+                                  <span className="text-[8px] font-bold uppercase tracking-wider">{ritual.label}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
                     </div>
                   );
                 })}

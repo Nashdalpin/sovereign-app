@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Crown, Compass, ShieldCheck, Sun, Moon, ChartNoAxesCombined, LogOut, X } from "lucide-react";
+import { Crown, Compass, ShieldCheck, Sun, Moon, ChartNoAxesCombined, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
@@ -93,9 +93,6 @@ export function AppLayoutContent({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-1">
           <button onClick={toggleTheme} aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'} className="opacity-30 hover:opacity-100 transition-all p-2">
             {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
-          </button>
-          <button onClick={() => window.close()} aria-label="Fechar app" className="opacity-30 hover:opacity-100 transition-all p-2" title="Fechar app">
-            <X size={14} />
           </button>
           <button onClick={handleLogout} aria-label="Sign out" className="opacity-30 hover:opacity-100 transition-all p-2" title="Sign out">
             <LogOut size={14} />
