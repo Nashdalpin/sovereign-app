@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { useFoco, Pillar, type RitualDefinition } from '@/lib/store';
 import { RITUAL_ICON_MAP, RITUAL_ICON_KEYS } from '@/lib/ritual-icons';
 import {
-  Coins, Briefcase, Heart, User, ArrowLeft, Settings, Plus, Trash2
+  Coins, Briefcase, Heart, User, ArrowLeft, Settings, Plus, Trash2, Watch, Copy, Check
 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -26,6 +28,8 @@ function slugify(text: string): string {
 
 export default function SanctuaryConfigPage() {
   const { isHydrated, getPillarRituals, setPillarRituals, ritualDefinitions, addRitual, deleteRitual } = useFoco();
+  const { toast } = useToast();
+  const [watchTokenCopied, setWatchTokenCopied] = useState(false);
   const [newRitual, setNewRitual] = useState<{ label: string; labelPt: string; icon: string }>({
     label: '',
     labelPt: '',
@@ -234,6 +238,49 @@ export default function SanctuaryConfigPage() {
             </div>
           );
         })}
+      </section>
+
+      <section className="luxury-blur p-6 rounded-[2.5rem] border border-white/5 luxury-shadow bg-black/20 space-y-4">
+        <div className="flex items-center gap-3">
+          <Watch size={20} className="text-primary opacity-40" />
+          <h2 className="text-lg luxury-text">Relógio</h2>
+        </div>
+        <p className="text-[9px] font-medium uppercase tracking-[0.4em] opacity-50">
+          Para o relógio ficar sempre sincronizado, define em <code className="rounded bg-white/10 px-1 text-[8px]">config-watch.json</code>: <code className="rounded bg-white/10 px-1 text-[8px]">apiBase</code>, <code className="rounded bg-white/10 px-1 text-[8px]">accessToken</code> e <code className="rounded bg-white/10 px-1 text-[8px]">refreshToken</code>. O refresh permite renovação automática do token.
+        </p>
+        <p className="text-[8px] opacity-40">
+          apiBase: <code className="rounded bg-white/10 px-1">{typeof window !== 'undefined' ? window.location.origin : ''}</code>
+        </p>
+        <button
+          type="button"
+          onClick={async () => {
+            const supabase = createClient();
+            const { data: { session } } = await supabase.auth.getSession();
+            const accessToken = session?.access_token;
+            const refreshToken = session?.refresh_token;
+            if (!accessToken || !refreshToken) {
+              toast({ title: 'Sem sessão', description: 'Faz login primeiro.', variant: 'elegant' });
+              return;
+            }
+            try {
+              const payload = JSON.stringify({
+                accessToken,
+                refreshToken,
+                expiresIn: session?.expires_in ?? 3600,
+              });
+              await navigator.clipboard.writeText(payload);
+              setWatchTokenCopied(true);
+              toast({ title: 'Tokens copiados', description: 'Copia accessToken e refreshToken do JSON para config-watch.json (renovação automática).', variant: 'elegant' });
+              setTimeout(() => setWatchTokenCopied(false), 2000);
+            } catch {
+              toast({ title: 'Erro', description: 'Não foi possível copiar.', variant: 'elegant' });
+            }
+          }}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-primary/30 bg-primary/5 text-primary text-[9px] font-black uppercase tracking-wider hover:bg-primary/10"
+        >
+          {watchTokenCopied ? <Check size={14} /> : <Copy size={14} />}
+          {watchTokenCopied ? 'Copiado' : 'Copiar tokens (acesso + refresh)'}
+        </button>
       </section>
 
       <div className="h-10" />
