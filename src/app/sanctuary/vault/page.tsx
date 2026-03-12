@@ -6,7 +6,7 @@ import { useFoco, Pillar, Priority } from '@/lib/store';
 import { RITUAL_ICON_MAP } from '@/lib/ritual-icons';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Briefcase, Coins, Heart, User, Plus, Trash2, Gem, AlertTriangle, Zap, ArrowLeft, Settings, ChevronDown, Banknote, GitBranch, Flag
+  Briefcase, Coins, Heart, User, Plus, Trash2, Gem, AlertTriangle, Zap, ArrowLeft, Settings, ChevronDown, Banknote, GitBranch, Flag, Pencil
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
@@ -18,30 +18,49 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { PILLAR_CONFIG } from '@/lib/constants';
 
 export default function SanctuaryVaultPage() {
-  const { assets, addAsset, deleteAsset, updateAsset, isHydrated, assetAnalytics, updateAssetCriticalRituals, getDefaultCriticalRitualsForPillar, ritualDefinitions, updateAssetTasks, addGoalEntry, deleteGoalEntry, getGoalEntriesForAsset, getNextStepInPath, isAssetComplete } = useFoco();
+  const { assets, addAsset, addAssetWithLinkedCapital, deleteAsset, updateAsset, isHydrated, assetAnalytics, updateAssetCriticalRituals, getDefaultCriticalRitualsForPillar, ritualDefinitions, updateAssetTasks, addGoalEntry, deleteGoalEntry, getGoalEntriesForAsset, getNextStepInPath, isAssetComplete } = useFoco();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
-  const [newAsset, setNewAsset] = useState<{ name: string; category: Pillar; priority: Priority; target: string; targetType: 'hours' | 'money'; targetMoney: string; horizon: string; parentAssetId: string; stepOrder: string }>({
-    name: '', category: 'capital', priority: 'medium', target: '', targetType: 'hours', targetMoney: '', horizon: '1', parentAssetId: '', stepOrder: '1'
+  const [newAsset, setNewAsset] = useState<{
+    name: string; category: Pillar; priority: Priority; target: string; targetType: 'hours' | 'money' | 'hours_and_money';
+    targetMoney: string; targetMoneyForLink: string; horizon: string; parentAssetId: string; stepOrder: string;
+    targetWeight: string; currentWeight: string; targetUnit: string;
+  }>({
+    name: '', category: 'capital', priority: 'medium', target: '', targetType: 'hours', targetMoney: '', targetMoneyForLink: '', horizon: '1', parentAssetId: '', stepOrder: '1', targetWeight: '', currentWeight: '', targetUnit: ''
   });
   const [entryModalAssetId, setEntryModalAssetId] = useState<string | null>(null);
   const [entryAmount, setEntryAmount] = useState('');
   const [entryNote, setEntryNote] = useState('');
+  const [editAssetId, setEditAssetId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<{ name: string; category: Pillar; priority: Priority; target: string; horizon: string; parentAssetId: string; stepOrder: string }>({ name: '', category: 'capital', priority: 'medium', target: '', horizon: '1', parentAssetId: '', stepOrder: '1' });
 
   const handleAdd = () => {
-    const isMoney = newAsset.category === 'capital' && newAsset.targetType === 'money';
+    const horizon = parseInt(newAsset.horizon, 10) as 1 | 5 | 10;
+    const isCapital = newAsset.category === 'capital';
+    const isMoneyOnly = (isCapital && newAsset.targetType === 'money') || (!isCapital && newAsset.targetType === 'money');
+    const isHoursAndMoney = !isCapital && newAsset.targetType === 'hours_and_money';
+
     if (!newAsset.name) return;
-    if (isMoney) {
+
+    if (isHoursAndMoney) {
+      const capitalAmount = parseFloat(newAsset.targetMoneyForLink);
+      const targetHours = parseFloat(newAsset.target) || 0;
+      if (!(capitalAmount > 0)) return;
+      const pathOpts = newAsset.parentAssetId && newAsset.stepOrder ? { parentAssetId: newAsset.parentAssetId, stepOrder: parseInt(newAsset.stepOrder, 10) || 1 } : undefined;
+      const weight = newAsset.category === 'vitality' && newAsset.targetWeight ? { targetWeight: parseFloat(newAsset.targetWeight), currentWeight: newAsset.currentWeight ? parseFloat(newAsset.currentWeight) : undefined, unit: newAsset.targetUnit || undefined } : undefined;
+      addAssetWithLinkedCapital(newAsset.name, newAsset.category, newAsset.priority, targetHours, horizon, capitalAmount, pathOpts, weight);
+      toast({ title: 'Goal created', description: 'Capital sub-goal created for funding.', variant: 'elegant' });
+    } else if (isMoneyOnly) {
       const amount = parseFloat(newAsset.targetMoney);
       if (!(amount > 0)) return;
-      addAsset(newAsset.name, newAsset.category, newAsset.priority, 0, parseInt(newAsset.horizon) as 1 | 5 | 10, { targetAmount: amount, currency: 'EUR' });
+      addAsset(newAsset.name, newAsset.category, newAsset.priority, 0, horizon, { targetAmount: amount, currency: 'EUR' });
     } else {
       if (!newAsset.target) return;
       const pathOpts = newAsset.parentAssetId && newAsset.stepOrder ? { parentAssetId: newAsset.parentAssetId, stepOrder: parseInt(newAsset.stepOrder, 10) || 1 } : undefined;
-      addAsset(newAsset.name, newAsset.category, newAsset.priority, parseFloat(newAsset.target), parseInt(newAsset.horizon) as 1 | 5 | 10, undefined, pathOpts);
+      addAsset(newAsset.name, newAsset.category, newAsset.priority, parseFloat(newAsset.target), horizon, undefined, pathOpts);
     }
     setIsOpen(false);
-    setNewAsset({ name: '', category: 'capital', priority: 'medium', target: '', targetType: 'hours', targetMoney: '', horizon: '1', parentAssetId: '', stepOrder: '1' });
+    setNewAsset({ name: '', category: 'capital', priority: 'medium', target: '', targetType: 'hours', targetMoney: '', targetMoneyForLink: '', horizon: '1', parentAssetId: '', stepOrder: '1', targetWeight: '', currentWeight: '', targetUnit: '' });
   };
 
   const handleAddEntry = () => {
@@ -55,9 +74,52 @@ export default function SanctuaryVaultPage() {
     toast({ title: 'Entry recorded', description: `${amount} € added to goal.`, variant: 'elegant' });
   };
 
+  const openEdit = (asset: typeof assets[0]) => {
+    setEditAssetId(asset.id);
+    const isMoney = (asset.targetType ?? 'hours') === 'money';
+    setEditForm({
+      name: asset.name,
+      category: asset.category,
+      priority: asset.priority,
+      target: isMoney ? String(asset.targetAmount ?? '') : String(asset.targetHours ?? ''),
+      horizon: String(asset.horizonYears),
+      parentAssetId: asset.parentAssetId ?? '',
+      stepOrder: String(asset.stepOrder ?? 1),
+    });
+  };
+
+  const handleSaveEdit = () => {
+    if (!editAssetId) return;
+    const asset = assets.find(a => a.id === editAssetId);
+    if (!asset) return;
+    const isMoney = (asset.targetType ?? 'hours') === 'money';
+    const horizon = parseInt(editForm.horizon, 10) as 1 | 5 | 10;
+    if (!editForm.name.trim()) return;
+    if (isMoney) {
+      const amount = parseFloat(editForm.target);
+      if (!(amount > 0)) return;
+      updateAsset(editAssetId, { name: editForm.name.trim(), category: editForm.category, priority: editForm.priority, targetAmount: amount, horizonYears: horizon });
+    } else {
+      const targetHours = parseFloat(editForm.target);
+      if (Number.isNaN(targetHours) || targetHours < 0) return;
+      updateAsset(editAssetId, {
+        name: editForm.name.trim(),
+        category: editForm.category,
+        priority: editForm.priority,
+        targetHours,
+        horizonYears: horizon,
+        parentAssetId: editForm.parentAssetId || undefined,
+        stepOrder: editForm.stepOrder ? parseInt(editForm.stepOrder, 10) : undefined,
+      });
+    }
+    setEditAssetId(null);
+    toast({ title: 'Mandate updated', variant: 'elegant' });
+  };
+
   const viability = useMemo(() => {
     const years = parseInt(newAsset.horizon) || 1;
-    const isMoney = newAsset.category === 'capital' && newAsset.targetType === 'money';
+    const isMoney = (newAsset.category === 'capital' && newAsset.targetType === 'money') || (newAsset.category !== 'capital' && newAsset.targetType === 'money');
+    const isHoursAndMoney = newAsset.category !== 'capital' && newAsset.targetType === 'hours_and_money';
     if (isMoney) {
       const amount = parseFloat(newAsset.targetMoney) || 0;
       if (amount <= 0) return { daily: 0, monthly: 0, status: 'none' as const };
@@ -65,14 +127,16 @@ export default function SanctuaryVaultPage() {
       return { daily: 0, monthly, status: 'optimal' as const };
     }
     const hours = parseFloat(newAsset.target) || 0;
-    if (hours <= 0) return { daily: 0, monthly: 0, status: 'none' as const };
+    if (hours <= 0 && !isHoursAndMoney) return { daily: 0, monthly: 0, status: 'none' as const };
     const daily = hours / (years * 365);
     let status: 'optimal' | 'demanding' | 'high' | 'impossible' = 'optimal';
     if (daily > 10) status = 'impossible';
     else if (daily > 5) status = 'high';
     else if (daily > 2) status = 'demanding';
-    return { daily, monthly: 0, status };
-  }, [newAsset.target, newAsset.targetMoney, newAsset.targetType, newAsset.category, newAsset.horizon]);
+    const linkAmount = isHoursAndMoney ? parseFloat(newAsset.targetMoneyForLink) || 0 : 0;
+    const monthly = linkAmount > 0 ? linkAmount / (years * 12) : 0;
+    return { daily, monthly, status };
+  }, [newAsset.target, newAsset.targetMoney, newAsset.targetMoneyForLink, newAsset.targetType, newAsset.category, newAsset.horizon]);
 
   type RefineSuggestion = {
     assetId: string;
@@ -229,23 +293,66 @@ export default function SanctuaryVaultPage() {
                   </div>
                 </div>
 
-                {newAsset.category === 'capital' && (
-                  <div className="space-y-2">
+                {(newAsset.category === 'capital' || newAsset.category === 'vitality' || newAsset.category === 'professional' || newAsset.category === 'personal') && (
+                  <div className="space-y-3">
                     <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground truncate block">Goal type</Label>
-                    <Select value={newAsset.targetType} onValueChange={(v) => setNewAsset({ ...newAsset, targetType: v as 'hours' | 'money' })}>
-                      <SelectTrigger className="rounded-full h-12 sm:h-14 bg-muted/50 border border-border dark:border-white/10 px-4 sm:px-6 text-[10px] font-black uppercase tracking-[0.2em]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-[2.5rem] luxury-blur border border-border dark:border-white/10 border-primary/10 bg-card">
-                        <SelectItem value="hours" className="flex items-center gap-2"><Zap size={12} /> Hours (focus)</SelectItem>
-                        <SelectItem value="money" className="flex items-center gap-2"><Banknote size={12} /> Money (savings)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div
+                      role="group"
+                      aria-label="Goal type"
+                      className="flex rounded-[2rem] p-1.5 bg-muted/30 dark:bg-white/5 border border-border dark:border-white/10 luxury-blur overflow-hidden"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setNewAsset({ ...newAsset, targetType: 'hours' })}
+                        aria-pressed={newAsset.targetType === 'hours' || (newAsset.category === 'capital' && newAsset.targetType === 'hours_and_money')}
+                        className={cn(
+                          "flex-1 flex items-center justify-center gap-2 min-h-12 rounded-[1.5rem] text-[10px] font-bold uppercase tracking-[0.15em] transition-all duration-300",
+                          (newAsset.targetType === 'hours' || (newAsset.category === 'capital' && newAsset.targetType === 'hours_and_money'))
+                            ? "bg-primary text-primary-foreground shadow-[0_0_20px_rgba(212,175,55,0.25)]"
+                            : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                        )}
+                      >
+                        <Zap size={14} strokeWidth={2} className="shrink-0" />
+                        <span>Hours</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewAsset({ ...newAsset, targetType: 'money' })}
+                        aria-pressed={newAsset.targetType === 'money'}
+                        className={cn(
+                          "flex-1 flex items-center justify-center gap-2 min-h-12 rounded-[1.5rem] text-[10px] font-bold uppercase tracking-[0.15em] transition-all duration-300",
+                          newAsset.targetType === 'money'
+                            ? "bg-primary text-primary-foreground shadow-[0_0_20px_rgba(212,175,55,0.25)]"
+                            : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                        )}
+                      >
+                        <Banknote size={14} strokeWidth={2} className="shrink-0" />
+                        <span>Money</span>
+                      </button>
+                      {newAsset.category !== 'capital' && (
+                        <button
+                          type="button"
+                          onClick={() => setNewAsset({ ...newAsset, targetType: 'hours_and_money' })}
+                          aria-pressed={newAsset.targetType === 'hours_and_money'}
+                          className={cn(
+                            "flex-1 flex items-center justify-center gap-1.5 min-h-12 rounded-[1.5rem] text-[10px] font-bold uppercase tracking-[0.12em] transition-all duration-300",
+                            newAsset.targetType === 'hours_and_money'
+                              ? "bg-primary text-primary-foreground shadow-[0_0_20px_rgba(212,175,55,0.25)]"
+                              : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                          )}
+                        >
+                          <Zap size={12} strokeWidth={2} className="shrink-0" />
+                          <span className="opacity-70">+</span>
+                          <Banknote size={12} strokeWidth={2} className="shrink-0" />
+                          <span className="truncate">Hours + €</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {newAsset.category === 'capital' && newAsset.targetType === 'money' ? (
+                  {(newAsset.category === 'capital' && newAsset.targetType === 'money') || (newAsset.category !== 'capital' && newAsset.targetType === 'money') ? (
                     <div className="space-y-2 min-w-0">
                       <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground truncate block">Target (€)</Label>
                       <Input
@@ -278,6 +385,17 @@ export default function SanctuaryVaultPage() {
                     </Select>
                   </div>
                 </div>
+
+                {newAsset.category !== 'capital' && newAsset.targetType === 'hours_and_money' && (
+                  <div className="flex items-center gap-3">
+                    <Label className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground shrink-0">Amount (€)</Label>
+                    <Input
+                      type="number" value={newAsset.targetMoneyForLink} placeholder="1500"
+                      className="rounded-full h-11 flex-1 bg-muted/50 border border-border dark:border-white/10 px-4 text-sm"
+                      onChange={(e) => setNewAsset({ ...newAsset, targetMoneyForLink: e.target.value })}
+                    />
+                  </div>
+                )}
 
                 {viability.daily > 0 && (
                   <div className={cn(
@@ -315,7 +433,7 @@ export default function SanctuaryVaultPage() {
                   </div>
                 )}
 
-                {newAsset.targetType === 'hours' && (
+                {(newAsset.targetType === 'hours' || newAsset.targetType === 'hours_and_money') && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2 min-w-0">
                       <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground block truncate">
@@ -348,7 +466,12 @@ export default function SanctuaryVaultPage() {
 
                 <button
                   onClick={handleAdd}
-                  disabled={viability.status === 'impossible' || (newAsset.category === 'capital' && newAsset.targetType === 'money' && !(parseFloat(newAsset.targetMoney) > 0))}
+                  disabled={
+                    viability.status === 'impossible'
+                    || (newAsset.category === 'capital' && newAsset.targetType === 'money' && !(parseFloat(newAsset.targetMoney) > 0))
+                    || (newAsset.category !== 'capital' && newAsset.targetType === 'money' && !(parseFloat(newAsset.targetMoney) > 0))
+                    || (newAsset.targetType === 'hours_and_money' && !(parseFloat(newAsset.targetMoneyForLink) > 0))
+                  }
                   className={cn(
                     "w-full h-20 mt-6 rounded-full text-[11px] font-black uppercase tracking-[1em] transition-all luxury-shadow gold-glow",
                     viability.status === 'impossible' ? "bg-muted/50 text-muted-foreground cursor-not-allowed dark:bg-white/5 dark:text-white/10" : "bg-foreground text-background hover:bg-primary active:scale-95"
@@ -417,9 +540,14 @@ export default function SanctuaryVaultPage() {
                               : `${ana.dailyRequired.toFixed(1)}h Daily / ${asset.horizonYears}Y Horizon`}
                           </p>
                         </div>
-                        <button onClick={() => deleteAsset(asset.id)} className="p-3 opacity-15 hover:opacity-100 transition-all text-destructive hover:scale-110">
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => openEdit(asset)} className="p-3 opacity-40 hover:opacity-100 transition-all hover:scale-110" aria-label={`Edit ${asset.name}`}>
+                            <Pencil size={14} />
+                          </button>
+                          <button onClick={() => deleteAsset(asset.id)} className="p-3 opacity-15 hover:opacity-100 transition-all text-destructive hover:scale-110" aria-label={`Delete ${asset.name}`}>
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="space-y-4">
@@ -579,6 +707,96 @@ export default function SanctuaryVaultPage() {
               </button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editAssetId != null} onOpenChange={(open) => !open && setEditAssetId(null)}>
+        <DialogContent className="rounded-[3rem] border border-primary/20 luxury-blur p-6 sm:p-8 bg-card/95 backdrop-blur-3xl max-w-[94vw] sm:max-w-md mx-auto" aria-labelledby="edit-mandate-title">
+          <DialogHeader>
+            <DialogTitle id="edit-mandate-title" className="text-xl luxury-text">Edit mandate</DialogTitle>
+            <DialogDescription className="text-[9px] uppercase tracking-[0.5em] text-muted-foreground">
+              {editAssetId ? assets.find(a => a.id === editAssetId)?.name : ''}
+            </DialogDescription>
+          </DialogHeader>
+          {editAssetId && (() => {
+            const asset = assets.find(a => a.id === editAssetId);
+            const isMoney = asset && (asset.targetType ?? 'hours') === 'money';
+            return (
+              <div className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground">Name</Label>
+                  <Input value={editForm.name} onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))} className="rounded-full h-11 bg-muted/50 border border-border dark:border-white/10 px-4" placeholder="Mandate name" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground">Pillar</Label>
+                    <Select value={editForm.category} onValueChange={(v) => setEditForm(f => ({ ...f, category: v as Pillar }))}>
+                      <SelectTrigger className="rounded-full h-11 bg-muted/50 border border-border dark:border-white/10 px-4 text-[10px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-border dark:border-white/10 bg-card">
+                        {PILLAR_CONFIG.map(p => (<SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground">Priority</Label>
+                    <Select value={editForm.priority} onValueChange={(v) => setEditForm(f => ({ ...f, priority: v as Priority }))}>
+                      <SelectTrigger className="rounded-full h-11 bg-muted/50 border border-border dark:border-white/10 px-4 text-[10px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-border dark:border-white/10 bg-card">
+                        <SelectItem value="high">Alpha</SelectItem>
+                        <SelectItem value="medium">Beta</SelectItem>
+                        <SelectItem value="low">Gamma</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground">{isMoney ? 'Target (€)' : 'Target (hours)'}</Label>
+                  <Input type="number" value={editForm.target} onChange={(e) => setEditForm(f => ({ ...f, target: e.target.value }))} className="rounded-full h-11 bg-muted/50 border border-border dark:border-white/10 px-4" placeholder={isMoney ? '5000' : '1000'} />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground">Horizon</Label>
+                  <Select value={editForm.horizon} onValueChange={(v) => setEditForm(f => ({ ...f, horizon: v }))}>
+                    <SelectTrigger className="rounded-full h-11 bg-muted/50 border border-border dark:border-white/10 px-4 text-[10px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl border-border dark:border-white/10 bg-card">
+                      <SelectItem value="1">1 Year</SelectItem>
+                      <SelectItem value="5">5 Years</SelectItem>
+                      <SelectItem value="10">10 Years</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {!isMoney && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground">Parent goal</Label>
+                      <Select value={editForm.parentAssetId || 'none'} onValueChange={(v) => setEditForm(f => ({ ...f, parentAssetId: v === 'none' ? '' : v }))}>
+                        <SelectTrigger className="rounded-full h-11 bg-muted/50 border border-border dark:border-white/10 px-4 text-[10px]">
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-2xl border-border dark:border-white/10 bg-card">
+                          <SelectItem value="none">None</SelectItem>
+                          {assets.filter(a => a.category === editForm.category && !a.parentAssetId && a.id !== editAssetId && (a.targetType ?? 'hours') === 'hours').map(a => (<SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground">Step order</Label>
+                      <Input type="number" min={1} value={editForm.stepOrder} onChange={(e) => setEditForm(f => ({ ...f, stepOrder: e.target.value || '1' }))} className="rounded-full h-11 bg-muted/50 border border-border dark:border-white/10 px-4" />
+                    </div>
+                  </div>
+                )}
+                <div className="flex gap-3 pt-2">
+                  <button onClick={() => setEditAssetId(null)} className="flex-1 py-3 rounded-full border border-border dark:border-white/10 text-[10px] font-bold uppercase tracking-wider">Cancel</button>
+                  <button onClick={handleSaveEdit} className="flex-1 py-3 rounded-full bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-wider hover:opacity-90">Save</button>
+                </div>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 

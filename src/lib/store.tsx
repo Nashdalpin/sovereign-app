@@ -31,6 +31,12 @@ export type RitualDefinition = {
   label: string;
   labelPt: string;
   icon: string;
+  /** 'check' = checkbox (default), 'number' = daily numeric input */
+  type?: 'check' | 'number';
+  /** For type 'number': unit label (e.g. kg, lbs, cm) */
+  unit?: string;
+  /** For type 'number': optional target to show (e.g. 70) */
+  targetValue?: number;
 };
 
 export type AssetTargetType = 'hours' | 'money';
@@ -56,6 +62,14 @@ export type Asset = {
   parentAssetId?: string | null;
   /** Order in path (1 = first step) among siblings with same parent */
   stepOrder?: number | null;
+  /** When set on Professional/Personal/Vitality: Capital asset that tracks money for this goal */
+  linkedCapitalAssetId?: string | null;
+  /** Target value for measurable goals (e.g. weight, waist); unit in targetUnit */
+  targetWeight?: number | null;
+  /** Current value for progress */
+  currentWeight?: number | null;
+  /** Optional unit for target/current (e.g. kg, lbs, cm) */
+  targetUnit?: string | null;
 };
 
 export type GoalEntry = {
@@ -70,6 +84,12 @@ export type GoalEntry = {
 /** Daily state per ritual (id -> checked or not). Keys come from ritualDefinitions. */
 export type Vitals = Record<string, boolean>;
 
+/** Daily numeric values for rituals with type 'number'. ritualId -> value */
+export type RitualNumericValues = Record<string, number>;
+
+export type RitualNumericHistoryEntry = { ritualId: string; date: string; value: number };
+export type RitualNumericHistory = RitualNumericHistoryEntry[];
+
 interface AssetStoreContextType {
   assets: Asset[];
   goalEntries: GoalEntry[];
@@ -83,6 +103,10 @@ interface AssetStoreContextType {
     todayFocusSecs: number;
   };
   vitals: Vitals;
+  ritualNumericValues: RitualNumericValues;
+  /** Time series of numeric ritual values (from API). Keyed by ritual for charts/trends. */
+  ritualNumericHistory: RitualNumericHistory;
+  setRitualNumericValue: (ritualId: string, value: number | null) => void;
   ritualDefinitions: RitualDefinition[];
   addRitual: (def: RitualDefinition) => void;
   deleteRitual: (id: string) => void;
@@ -91,6 +115,8 @@ interface AssetStoreContextType {
   dailyTargetHours: number;
   isHydrated: boolean;
   addAsset: (name: string, category: Pillar, priority: Priority, targetHours: number, horizonYears: 1 | 5 | 10, moneyGoal?: { targetAmount: number; currency?: string }, pathOptions?: { parentAssetId: string; stepOrder: number }) => void;
+  /** Creates a Capital sub-goal for the amount, then the main goal (hours) with link. Use for Professional/Personal/Vitality when goal has a cost. */
+  addAssetWithLinkedCapital: (name: string, category: Pillar, priority: Priority, targetHours: number, horizonYears: 1 | 5 | 10, capitalAmount: number, pathOptions?: { parentAssetId: string; stepOrder: number }, weight?: { targetWeight: number; currentWeight?: number; unit?: string }) => void;
   deleteAsset: (id: string) => void;
   toggleFocus: (assetId?: string | null) => void;
   updateAssetTasks: (assetId: string, tasks: { title: string, priority: Priority }[]) => void;
@@ -126,7 +152,7 @@ interface AssetStoreContextType {
   setPillarRituals: (pillar: Pillar, rituals: string[]) => void;
   updateAssetCriticalRituals: (assetId: string, rituals: string[]) => void;
   getDefaultCriticalRitualsForPillar: (pillar: Pillar) => string[];
-  updateAsset: (assetId: string, updates: Partial<Pick<Asset, 'targetHours' | 'horizonYears' | 'priority' | 'targetAmount' | 'currency' | 'parentAssetId' | 'stepOrder'>>) => void;
+  updateAsset: (assetId: string, updates: Partial<Pick<Asset, 'name' | 'category' | 'targetHours' | 'horizonYears' | 'priority' | 'targetAmount' | 'currency' | 'parentAssetId' | 'stepOrder' | 'linkedCapitalAssetId' | 'targetWeight' | 'currentWeight' | 'targetUnit'>>) => void;
 }
 
 const AssetStoreContext = createContext<AssetStoreContextType | undefined>(undefined);
@@ -143,6 +169,9 @@ function getDefaultFocoContext(): AssetStoreContextType {
     getGoalEntriesForAsset: () => [],
     lifeTracker: { activeMode: 'passive', activeAssetId: null, stateStartTime: now, todayFocusSecs: 0 },
     vitals: {},
+    ritualNumericValues: {},
+    ritualNumericHistory: [],
+    setRitualNumericValue: noop,
     ritualDefinitions: DEFAULT_RITUAL_DEFINITIONS,
     addRitual: noop,
     deleteRitual: noop,
@@ -151,6 +180,7 @@ function getDefaultFocoContext(): AssetStoreContextType {
     dailyTargetHours: 0,
     isHydrated: false,
     addAsset: noop,
+    addAssetWithLinkedCapital: noop,
     deleteAsset: noop,
     toggleFocus: noop,
     updateAssetTasks: noop,
@@ -220,6 +250,8 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
   const [currentBlockIndex, setCurrentBlockIndexState] = useState<number | null>(null);
   const [currentBlockSuggestedMinutes, setCurrentBlockSuggestedMinutes] = useState<number | null>(null);
   const [pillarRitualsConfig, setPillarRitualsConfig] = useState<Record<Pillar, string[]>>(DEFAULT_CRITICAL_RITUALS_BY_PILLAR);
+  const [ritualNumericValues, setRitualNumericValuesState] = useState<RitualNumericValues>({});
+  const [ritualNumericHistory, setRitualNumericHistory] = useState<RitualNumericHistory>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const initialLoadFromApiDone = useRef(false);
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -262,6 +294,10 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
               currency: a.currency ?? undefined,
               parentAssetId: a.parentAssetId ?? undefined,
               stepOrder: a.stepOrder != null ? Number(a.stepOrder) : undefined,
+              linkedCapitalAssetId: a.linkedCapitalAssetId ?? undefined,
+              targetWeight: a.targetWeight != null ? Number(a.targetWeight) : undefined,
+              currentWeight: a.currentWeight != null ? Number(a.currentWeight) : undefined,
+              targetUnit: a.targetUnit ?? undefined,
             })));
             setSessionLogs(data.sessionLogs ?? []);
             setGoalEntries(data.goalEntries ?? []);
@@ -283,6 +319,8 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
             setCompletedBlockIndices(data.appState?.completedBlockIndices ?? []);
             setCurrentBlockIndexState(data.appState?.currentBlockIndex ?? null);
             setCurrentBlockSuggestedMinutes(data.appState?.currentBlockSuggestedMinutes ?? null);
+            setRitualNumericValuesState((data.appState?.ritualNumericValues as RitualNumericValues) ?? {});
+            setRitualNumericHistory(Array.isArray(data.ritualNumericHistory) ? data.ritualNumericHistory : []);
           } else if (lastErr) {
             console.error('Failed to load from API after retries', lastErr);
             if (typeof window !== 'undefined' && lastErr instanceof TypeError && (lastErr as Error).message?.toLowerCase().includes('fetch')) {
@@ -311,6 +349,10 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
               currency: a.currency ?? undefined,
               parentAssetId: a.parentAssetId ?? undefined,
               stepOrder: a.stepOrder != null ? Number(a.stepOrder) : undefined,
+              linkedCapitalAssetId: a.linkedCapitalAssetId ?? undefined,
+              targetWeight: a.targetWeight != null ? Number(a.targetWeight) : undefined,
+              currentWeight: a.currentWeight != null ? Number(a.currentWeight) : undefined,
+              targetUnit: a.targetUnit ?? undefined,
             })));
             setSessionLogs(data.sessionLogs || []);
             setGoalEntries(data.goalEntries || []);
@@ -333,11 +375,13 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
               setCompletedBlockIndices(data.completedBlockIndices || []);
               setCurrentBlockIndexState(data.currentBlockIndex ?? null);
               setCurrentBlockSuggestedMinutes(data.currentBlockSuggestedMinutes ?? null);
+              setRitualNumericValuesState((data.ritualNumericValues as RitualNumericValues) || {});
             } else {
               setLifeTracker({ activeMode: 'passive', activeAssetId: null, stateStartTime: now, todayFocusSecs: 0 });
               setCompletedBlockIndices([]);
               setCurrentBlockIndexState(null);
               setCurrentBlockSuggestedMinutes(null);
+              setRitualNumericValuesState({});
             }
           } catch (e) {
             console.error('Storage corrupt', e);
@@ -360,6 +404,7 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
         goalEntries,
         lifeTracker,
         vitals,
+        ritualNumericValues,
         ritualDefinitions,
         lastDate: new Date().toDateString(),
         completedBlockIndices,
@@ -379,7 +424,7 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
       });
     }, 1500);
     return () => { if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current); };
-  }, [isHydrated, userId, assets, sessionLogs, goalEntries, lifeTracker, vitals, ritualDefinitions, completedBlockIndices, currentBlockIndex, currentBlockSuggestedMinutes, pillarRitualsConfig]);
+  }, [isHydrated, userId, assets, sessionLogs, goalEntries, lifeTracker, vitals, ritualNumericValues, ritualDefinitions, completedBlockIndices, currentBlockIndex, currentBlockSuggestedMinutes, pillarRitualsConfig]);
 
   useEffect(() => {
     if (!isHydrated || userId) return;
@@ -389,6 +434,7 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
       goalEntries,
       lifeTracker,
       vitals,
+      ritualNumericValues,
       ritualDefinitions,
       lastDate: new Date().toDateString(),
       completedBlockIndices,
@@ -397,7 +443,7 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
       pillarRitualsConfig
     };
     localStorage.setItem('sovereign_v5', JSON.stringify(data));
-  }, [assets, sessionLogs, goalEntries, lifeTracker, vitals, ritualDefinitions, isHydrated, userId, completedBlockIndices, currentBlockIndex, currentBlockSuggestedMinutes, pillarRitualsConfig]);
+  }, [assets, sessionLogs, goalEntries, lifeTracker, vitals, ritualNumericValues, ritualDefinitions, isHydrated, userId, completedBlockIndices, currentBlockIndex, currentBlockSuggestedMinutes, pillarRitualsConfig]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
@@ -416,9 +462,12 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
 
   const currentVitality = useMemo(() => {
     if (ritualDefinitions.length === 0) return 0;
-    const active = ritualDefinitions.filter((r) => vitals[r.id]).length;
+    const active = ritualDefinitions.filter((r) => {
+      if ((r as RitualDefinition).type === 'number') return ritualNumericValues[r.id] != null;
+      return vitals[r.id];
+    }).length;
     return Math.round((active / ritualDefinitions.length) * 10);
-  }, [vitals, ritualDefinitions]);
+  }, [vitals, ritualNumericValues, ritualDefinitions]);
 
   const assetAnalytics = useCallback((assetId: string) => {
     const asset = assets.find(a => a.id === assetId);
@@ -617,10 +666,52 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
     }]);
   };
 
+  const addAssetWithLinkedCapital = (name: string, category: Pillar, priority: Priority, targetHours: number, horizonYears: 1 | 5 | 10, capitalAmount: number, pathOptions?: { parentAssetId: string; stepOrder: number }, weight?: { targetWeight: number; currentWeight?: number; unit?: string }) => {
+    const capId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'cap-' + Math.random().toString(36).slice(2, 11);
+    const mainId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 11);
+    const capitalAsset: Asset = {
+      id: capId,
+      name: `Savings: ${name}`,
+      category: 'capital',
+      priority,
+      targetHours: 0,
+      investedHours: 0,
+      horizonYears,
+      dailyTasks: [],
+      createdAt: new Date().toISOString(),
+      criticalRituals: DEFAULT_CRITICAL_RITUALS_BY_PILLAR.capital,
+      targetType: 'money',
+      targetAmount: capitalAmount,
+      investedAmount: 0,
+      currency: 'EUR',
+    };
+    const mainAsset: Asset = {
+      id: mainId,
+      name,
+      category,
+      priority,
+      targetHours,
+      investedHours: 0,
+      horizonYears,
+      dailyTasks: [],
+      createdAt: new Date().toISOString(),
+      criticalRituals: DEFAULT_CRITICAL_RITUALS_BY_PILLAR[category],
+      targetType: 'hours',
+      linkedCapitalAssetId: capId,
+      ...(pathOptions ? { parentAssetId: pathOptions.parentAssetId, stepOrder: pathOptions.stepOrder } : {}),
+      ...(weight != null ? { targetWeight: weight.targetWeight, currentWeight: weight.currentWeight ?? null, targetUnit: weight.unit ?? null } : {}),
+    };
+    setAssets(prev => [...prev, capitalAsset, mainAsset]);
+  };
+
   const getMissingCriticalRituals = (asset: Asset | null): string[] => {
     if (!asset) return [];
     const rituals = asset.criticalRituals ?? DEFAULT_CRITICAL_RITUALS_BY_PILLAR[asset.category];
-    return rituals.filter((id) => !vitals[id]);
+    return rituals.filter((id) => {
+      const def = ritualDefinitions.find(r => r.id === id);
+      if (def?.type === 'number') return ritualNumericValues[id] == null;
+      return !vitals[id];
+    });
   };
 
   const getPillarRituals = (pillar: Pillar): string[] => pillarRitualsConfig[pillar] ?? DEFAULT_CRITICAL_RITUALS_BY_PILLAR[pillar];
@@ -632,7 +723,7 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
   };
   const getDefaultCriticalRitualsForPillar = (pillar: Pillar): string[] => DEFAULT_CRITICAL_RITUALS_BY_PILLAR[pillar];
 
-  const updateAsset = (assetId: string, updates: Partial<Pick<Asset, 'targetHours' | 'horizonYears' | 'priority' | 'targetAmount' | 'currency' | 'parentAssetId' | 'stepOrder'>>) => {
+  const updateAsset = (assetId: string, updates: Partial<Pick<Asset, 'name' | 'category' | 'targetHours' | 'horizonYears' | 'priority' | 'targetAmount' | 'currency' | 'parentAssetId' | 'stepOrder' | 'linkedCapitalAssetId' | 'targetWeight' | 'currentWeight' | 'targetUnit'>>) => {
     setAssets(prev => prev.map(a => a.id === assetId ? { ...a, ...updates } : a));
   };
 
@@ -668,10 +759,24 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
     setVitals(prev => ({ ...prev, [def.id]: false }));
   };
 
+  const setRitualNumericValue = (ritualId: string, value: number | null) => {
+    setRitualNumericValuesState(prev => {
+      const next = { ...prev };
+      if (value == null) delete next[ritualId];
+      else next[ritualId] = value;
+      return next;
+    });
+  };
+
   const deleteRitual = (id: string) => {
     if (ritualDefinitions.length <= 1) return;
     setRitualDefinitions(prev => prev.filter((r) => r.id !== id));
     setVitals(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setRitualNumericValuesState(prev => {
       const next = { ...prev };
       delete next[id];
       return next;
@@ -709,8 +814,9 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
     <AssetStoreContext.Provider value={{
       assets, goalEntries, addGoalEntry, deleteGoalEntry, getGoalEntriesForAsset,
       lifeTracker, sessionLogs, totalInvestment, dailyTargetHours, isHydrated, vitals,
+      ritualNumericValues, ritualNumericHistory, setRitualNumericValue,
       ritualDefinitions, addRitual, deleteRitual,
-      addAsset, deleteAsset, toggleFocus, updateAssetTasks, toggleTask, toggleVital, dailyStats,
+      addAsset, addAssetWithLinkedCapital, deleteAsset, toggleFocus, updateAssetTasks, toggleTask, toggleVital, dailyStats,
       intensityRequired, isCritical, netInvestableWindow, remainingCycleHours: netInvestableWindow,
       currentVitality, assetAnalytics, getPriorityAsset, getNextStepInPath, isAssetComplete,
       completedBlockIndices, currentBlockIndex, setCurrentBlockIndex, addCompletedBlock, setActiveAssetId, getCriticalAsset,

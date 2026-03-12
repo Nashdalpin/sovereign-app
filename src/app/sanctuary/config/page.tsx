@@ -30,10 +30,13 @@ export default function SanctuaryConfigPage() {
   const { isHydrated, getPillarRituals, setPillarRituals, ritualDefinitions, addRitual, deleteRitual } = useFoco();
   const { toast } = useToast();
   const [watchTokenCopied, setWatchTokenCopied] = useState(false);
-  const [newRitual, setNewRitual] = useState<{ label: string; labelPt: string; icon: string }>({
+  const [newRitual, setNewRitual] = useState<{ label: string; labelPt: string; icon: string; type: 'check' | 'number'; unit: string; targetValue: string }>({
     label: '',
     labelPt: '',
     icon: 'moon',
+    type: 'check',
+    unit: '',
+    targetValue: '',
   });
   const [showAddForm, setShowAddForm] = useState(false);
 
@@ -46,8 +49,15 @@ export default function SanctuaryConfigPage() {
       setNewRitual((prev) => ({ ...prev, label: '', labelPt: '' }));
       return;
     }
-    addRitual({ id, label, labelPt, icon: newRitual.icon });
-    setNewRitual({ label: '', labelPt: '', icon: 'moon' });
+    const def: RitualDefinition = { id, label, labelPt, icon: newRitual.icon };
+    if (newRitual.type === 'number') {
+      def.type = 'number';
+      if (newRitual.unit) def.unit = newRitual.unit;
+      const tv = parseFloat(newRitual.targetValue);
+      if (!Number.isNaN(tv)) def.targetValue = tv;
+    }
+    addRitual(def);
+    setNewRitual({ label: '', labelPt: '', icon: 'moon', type: 'check', unit: '', targetValue: '' });
     setShowAddForm(false);
   };
 
@@ -121,6 +131,46 @@ export default function SanctuaryConfigPage() {
                 />
               </div>
               <div className="space-y-1">
+                <Label className="text-[8px] uppercase opacity-60">Type</Label>
+                <Select value={newRitual.type} onValueChange={(v) => setNewRitual((p) => ({ ...p, type: v as 'check' | 'number' }))}>
+                  <SelectTrigger className="rounded-full h-10 bg-muted/30 border-border dark:bg-white/[0.04] dark:border-white/10 text-[11px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border-border dark:border-white/10 bg-card dark:bg-black/95">
+                    <SelectItem value="check">Check (done / not done)</SelectItem>
+                    <SelectItem value="number">Number (e.g. weight, waist)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {newRitual.type === 'number' && (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-[8px] uppercase opacity-60">Unit (optional)</Label>
+                    <Select value={newRitual.unit || 'none'} onValueChange={(v) => setNewRitual((p) => ({ ...p, unit: v === 'none' ? '' : v }))}>
+                      <SelectTrigger className="rounded-full h-10 bg-muted/30 border-border dark:bg-white/[0.04] dark:border-white/10 text-[11px]">
+                        <SelectValue placeholder="kg, lbs, cm..." />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-border dark:border-white/10 bg-card dark:bg-black/95">
+                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="kg">kg</SelectItem>
+                        <SelectItem value="lbs">lbs</SelectItem>
+                        <SelectItem value="cm">cm</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[8px] uppercase opacity-60">Target (optional)</Label>
+                    <Input
+                      type="number"
+                      value={newRitual.targetValue}
+                      onChange={(e) => setNewRitual((p) => ({ ...p, targetValue: e.target.value }))}
+                      placeholder="e.g. 70"
+                      className="rounded-full h-10 bg-muted/30 border-border dark:bg-white/[0.04] dark:border-white/10 text-[11px]"
+                    />
+                  </div>
+                </>
+              )}
+              <div className="space-y-1">
                 <Label className="text-[8px] uppercase opacity-60">Icon</Label>
                 <Select value={newRitual.icon} onValueChange={(v) => setNewRitual((p) => ({ ...p, icon: v }))}>
                   <SelectTrigger className="rounded-full h-10 bg-muted/30 border-border dark:bg-white/[0.04] dark:border-white/10 text-[11px]">
@@ -151,7 +201,7 @@ export default function SanctuaryConfigPage() {
               </button>
               <button
                 type="button"
-                onClick={() => { setShowAddForm(false); setNewRitual({ label: '', labelPt: '', icon: 'moon' }); }}
+                onClick={() => { setShowAddForm(false); setNewRitual({ label: '', labelPt: '', icon: 'moon', type: 'check', unit: '', targetValue: '' }); }}
                 className="px-4 py-2.5 rounded-full border border-border dark:border-white/10 text-[9px] font-bold uppercase"
               >
                 Cancel
@@ -172,7 +222,7 @@ export default function SanctuaryConfigPage() {
                   {IconComp && <IconComp size={18} className="opacity-50" />}
                   <div>
                     <p className="text-[10px] font-bold">{ritual.label}</p>
-                    <p className="text-[8px] opacity-50">{ritual.id}</p>
+                    <p className="text-[8px] opacity-50">{ritual.id}{ritual.type === 'number' && (ritual.unit || ritual.targetValue != null) && ` · ${[ritual.unit, ritual.targetValue != null ? `→ ${ritual.targetValue}` : ''].filter(Boolean).join(' ')}`}</p>
                   </div>
                 </div>
                 <button
@@ -191,53 +241,59 @@ export default function SanctuaryConfigPage() {
         </ul>
       </section>
 
-      <section className="space-y-10">
-        <h2 className="text-[10px] font-black uppercase tracking-[0.8em] opacity-30">Rituals per pillar</h2>
-        {PILLAR_CONFIG.map((pillar) => {
-          const currentRituals = getPillarRituals(pillar.id);
-          return (
-            <div
-              key={pillar.id}
-              className="luxury-blur p-6 rounded-[2.5rem] border border-border dark:border-white/5 luxury-shadow bg-muted/40 dark:bg-black/20 space-y-4"
-            >
-              <div className="flex items-center gap-3">
-                <pillar.icon size={20} className="text-primary opacity-40" />
-                <h3 className="text-xl luxury-text">{pillar.label}</h3>
-              </div>
-              <p className="text-[8px] font-bold uppercase tracking-[0.4em] opacity-30">
-                Rituals displayed in this pillar tab
-              </p>
-              <div className="flex flex-wrap gap-3">
-                {ritualDefinitions.map((ritual) => {
-                  const IconComp = RITUAL_ICON_MAP[ritual.icon];
-                  const checked = currentRituals.includes(ritual.id);
-                  return (
-                    <label
-                      key={ritual.id}
-                      className={cn(
-                        "flex items-center gap-2 cursor-pointer rounded-full px-4 py-2.5 border transition-all",
-                        checked ? "border-primary/40 bg-primary/5" : "border-border dark:border-white/5 opacity-50 hover:opacity-80"
-                      )}
-                    >
-                      <Checkbox
-                        checked={checked}
-                        onCheckedChange={() => {
-                          const next = checked
-                            ? currentRituals.filter((r) => r !== ritual.id)
-                            : [...currentRituals, ritual.id];
-                          setPillarRituals(pillar.id, next);
-                        }}
-                        className="border-border dark:border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                      />
-                      {IconComp && <IconComp size={14} className="opacity-60" />}
-                      <span className="text-[9px] font-bold uppercase tracking-wider">{ritual.label}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
+      <section className="luxury-blur p-4 rounded-[2rem] border border-border dark:border-white/5 luxury-shadow bg-muted/40 dark:bg-black/20">
+        <h2 className="text-[10px] font-black uppercase tracking-[0.6em] opacity-30 mb-3">Rituals per pillar</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-border dark:border-white/10">
+                <th className="py-2 pr-3 text-[9px] font-black uppercase tracking-wider opacity-50">Ritual</th>
+                {PILLAR_CONFIG.map((p) => (
+                  <th key={p.id} className="py-2 px-2 text-center">
+                    <span className="inline-flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-wider opacity-70">
+                      <p.icon size={12} className="opacity-60" />
+                      {p.label}
+                    </span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {ritualDefinitions.map((ritual) => {
+                const IconComp = RITUAL_ICON_MAP[ritual.icon];
+                return (
+                  <tr key={ritual.id} className="border-b border-border/50 dark:border-white/5 last:border-0">
+                    <td className="py-2 pr-3">
+                      <span className="flex items-center gap-2 text-[9px] font-bold">
+                        {IconComp && <IconComp size={12} className="opacity-50" />}
+                        {ritual.label}
+                      </span>
+                    </td>
+                    {PILLAR_CONFIG.map((pillar) => {
+                      const currentRituals = getPillarRituals(pillar.id);
+                      const checked = currentRituals.includes(ritual.id);
+                      return (
+                        <td key={pillar.id} className="py-2 px-2 text-center">
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={() => {
+                              const next = checked
+                                ? currentRituals.filter((r) => r !== ritual.id)
+                                : [...currentRituals, ritual.id];
+                              setPillarRituals(pillar.id, next);
+                            }}
+                            className="border-border dark:border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary mx-auto"
+                            aria-label={`${ritual.label} in ${pillar.label}`}
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="luxury-blur p-6 rounded-[2.5rem] border border-border dark:border-white/5 luxury-shadow bg-muted/40 dark:bg-black/20 space-y-4">

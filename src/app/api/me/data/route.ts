@@ -10,17 +10,19 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const lastDate = searchParams.get('date') ?? new Date().toDateString();
 
-  const [assetsRes, logsRes, entriesRes, stateRes] = await Promise.all([
+  const [assetsRes, logsRes, entriesRes, stateRes, historyRes] = await Promise.all([
     supabase.from('assets').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
     supabase.from('session_logs').select('*').eq('user_id', user.id).order('timestamp', { ascending: true }),
     supabase.from('goal_entries').select('*').eq('user_id', user.id).order('timestamp', { ascending: false }),
     supabase.from('app_state').select('*').eq('user_id', user.id).eq('last_date', lastDate).maybeSingle(),
+    supabase.from('ritual_numeric_history').select('ritual_id, date, value').eq('user_id', user.id).order('date', { ascending: false }),
   ]);
 
   if (assetsRes.error) return NextResponse.json({ error: assetsRes.error.message }, { status: 500 });
   if (logsRes.error) return NextResponse.json({ error: logsRes.error.message }, { status: 500 });
   if (entriesRes.error) return NextResponse.json({ error: entriesRes.error.message }, { status: 500 });
   if (stateRes.error) return NextResponse.json({ error: stateRes.error.message }, { status: 500 });
+  if (historyRes.error) return NextResponse.json({ error: historyRes.error.message }, { status: 500 });
 
   const assets = (assetsRes.data ?? []).map((row: Record<string, unknown>) => ({
     id: row.id,
@@ -39,6 +41,10 @@ export async function GET(request: Request) {
     currency: row.currency ?? undefined,
     parentAssetId: row.parent_asset_id ?? undefined,
     stepOrder: row.step_order != null ? Number(row.step_order) : undefined,
+    linkedCapitalAssetId: row.linked_capital_asset_id ?? undefined,
+    targetWeight: row.target_weight != null ? Number(row.target_weight) : undefined,
+    currentWeight: row.current_weight != null ? Number(row.current_weight) : undefined,
+    targetUnit: row.target_unit ?? undefined,
   }));
 
   const goalEntries = (entriesRes.data ?? []).map((row: Record<string, unknown>) => ({
@@ -69,14 +75,22 @@ export async function GET(request: Request) {
         completedBlockIndices: Array.isArray(row.completed_block_indices) ? row.completed_block_indices : [],
         currentBlockIndex: row.current_block_index ?? null,
         currentBlockSuggestedMinutes: row.current_block_suggested_minutes ?? null,
+        ritualNumericValues: (row.ritual_numeric_values as Record<string, number>) ?? {},
       }
     : null;
+
+  const ritualNumericHistory = (historyRes.data ?? []).map((row: { ritual_id: string; date: string; value: number }) => ({
+    ritualId: row.ritual_id,
+    date: row.date,
+    value: Number(row.value),
+  }));
 
   return NextResponse.json({
     assets,
     sessionLogs,
     goalEntries,
     appState,
+    ritualNumericHistory,
     lastDate,
   });
 }
@@ -106,6 +120,10 @@ export async function POST(request: Request) {
       currency?: string;
       parentAssetId?: string | null;
       stepOrder?: number | null;
+      linkedCapitalAssetId?: string | null;
+      targetWeight?: number | null;
+      currentWeight?: number | null;
+      targetUnit?: string | null;
     }>;
     sessionLogs?: Array<{
       id?: number;
@@ -125,6 +143,7 @@ export async function POST(request: Request) {
     }>;
     lifeTracker?: object;
     vitals?: Record<string, boolean>;
+    ritualNumericValues?: Record<string, number>;
     ritualDefinitions?: unknown[];
     lastDate?: string;
     completedBlockIndices?: number[];
@@ -162,6 +181,10 @@ export async function POST(request: Request) {
         currency: a.currency ?? 'EUR',
         parent_asset_id: a.parentAssetId ?? null,
         step_order: a.stepOrder ?? null,
+        linked_capital_asset_id: a.linkedCapitalAssetId ?? null,
+        target_weight: a.targetWeight ?? null,
+        current_weight: a.currentWeight ?? null,
+        target_unit: a.targetUnit ?? null,
       }));
       const { error: insErr } = await supabase.from('assets').insert(rows);
       if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
@@ -212,6 +235,7 @@ export async function POST(request: Request) {
         life_tracker: body.lifeTracker ?? {},
         ritual_definitions: body.ritualDefinitions ?? null,
         pillar_rituals_config: body.pillarRitualsConfig ?? {},
+        ritual_numeric_values: body.ritualNumericValues ?? {},
         completed_block_indices: body.completedBlockIndices ?? [],
         current_block_index: body.currentBlockIndex ?? null,
         current_block_suggested_minutes: body.currentBlockSuggestedMinutes ?? null,
@@ -220,6 +244,19 @@ export async function POST(request: Request) {
       { onConflict: 'user_id,last_date' }
     );
     if (upsertErr) return NextResponse.json({ error: upsertErr.message }, { status: 500 });
+
+    // Persist today's numeric values into ritual_numeric_history for time series
+    const numericValues = body.ritualNumericValues ?? {};
+    if (Object.keys(numericValues).length > 0) {
+      const historyRows = Object.entries(numericValues).map(([ritual_id, value]) => ({
+        user_id: user.id,
+        ritual_id,
+        date: lastDate,
+        value: Number(value),
+      }));
+      const { error: histErr } = await supabase.from('ritual_numeric_history').upsert(historyRows, { onConflict: 'user_id,ritual_id,date' });
+      if (histErr) return NextResponse.json({ error: histErr.message }, { status: 500 });
+    }
   }
 
   return NextResponse.json({ ok: true });
