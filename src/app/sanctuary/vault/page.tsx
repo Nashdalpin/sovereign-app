@@ -6,7 +6,7 @@ import { useFoco, Pillar, Priority } from '@/lib/store';
 import { RITUAL_ICON_MAP } from '@/lib/ritual-icons';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Briefcase, Coins, Heart, User, Plus, Trash2, Gem, AlertTriangle, Zap, ArrowLeft, Settings, ChevronDown
+  Briefcase, Coins, Heart, User, Plus, Trash2, Gem, AlertTriangle, Zap, ArrowLeft, Settings, ChevronDown, Banknote, GitBranch, Flag
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
@@ -18,39 +18,61 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { PILLAR_CONFIG } from '@/lib/constants';
 
 export default function SanctuaryVaultPage() {
-  const { assets, addAsset, deleteAsset, updateAsset, isHydrated, assetAnalytics, updateAssetCriticalRituals, getDefaultCriticalRitualsForPillar, ritualDefinitions, updateAssetTasks } = useFoco();
+  const { assets, addAsset, deleteAsset, updateAsset, isHydrated, assetAnalytics, updateAssetCriticalRituals, getDefaultCriticalRitualsForPillar, ritualDefinitions, updateAssetTasks, addGoalEntry, deleteGoalEntry, getGoalEntriesForAsset, getNextStepInPath, isAssetComplete } = useFoco();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
-  const [newAsset, setNewAsset] = useState<{ name: string; category: Pillar; priority: Priority; target: string; horizon: string }>({
-    name: '', category: 'capital', priority: 'medium', target: '', horizon: '1'
+  const [newAsset, setNewAsset] = useState<{ name: string; category: Pillar; priority: Priority; target: string; targetType: 'hours' | 'money'; targetMoney: string; horizon: string; parentAssetId: string; stepOrder: string }>({
+    name: '', category: 'capital', priority: 'medium', target: '', targetType: 'hours', targetMoney: '', horizon: '1', parentAssetId: '', stepOrder: '1'
   });
+  const [entryModalAssetId, setEntryModalAssetId] = useState<string | null>(null);
+  const [entryAmount, setEntryAmount] = useState('');
+  const [entryNote, setEntryNote] = useState('');
 
   const handleAdd = () => {
-    if (!newAsset.name || !newAsset.target) return;
-    addAsset(
-      newAsset.name,
-      newAsset.category,
-      newAsset.priority,
-      parseFloat(newAsset.target),
-      parseInt(newAsset.horizon) as 1 | 5 | 10
-    );
+    const isMoney = newAsset.category === 'capital' && newAsset.targetType === 'money';
+    if (!newAsset.name) return;
+    if (isMoney) {
+      const amount = parseFloat(newAsset.targetMoney);
+      if (!(amount > 0)) return;
+      addAsset(newAsset.name, newAsset.category, newAsset.priority, 0, parseInt(newAsset.horizon) as 1 | 5 | 10, { targetAmount: amount, currency: 'EUR' });
+    } else {
+      if (!newAsset.target) return;
+      const pathOpts = newAsset.parentAssetId && newAsset.stepOrder ? { parentAssetId: newAsset.parentAssetId, stepOrder: parseInt(newAsset.stepOrder, 10) || 1 } : undefined;
+      addAsset(newAsset.name, newAsset.category, newAsset.priority, parseFloat(newAsset.target), parseInt(newAsset.horizon) as 1 | 5 | 10, undefined, pathOpts);
+    }
     setIsOpen(false);
-    setNewAsset({ name: '', category: 'capital', priority: 'medium', target: '', horizon: '1' });
+    setNewAsset({ name: '', category: 'capital', priority: 'medium', target: '', targetType: 'hours', targetMoney: '', horizon: '1', parentAssetId: '', stepOrder: '1' });
+  };
+
+  const handleAddEntry = () => {
+    if (!entryModalAssetId || !entryAmount) return;
+    const amount = parseFloat(entryAmount.replace(',', '.'));
+    if (!(amount > 0)) return;
+    addGoalEntry(entryModalAssetId, amount, entryNote || null);
+    setEntryModalAssetId(null);
+    setEntryAmount('');
+    setEntryNote('');
+    toast({ title: 'Entry recorded', description: `${amount} € added to goal.`, variant: 'elegant' });
   };
 
   const viability = useMemo(() => {
-    const hours = parseFloat(newAsset.target) || 0;
     const years = parseInt(newAsset.horizon) || 1;
-    if (hours <= 0) return { daily: 0, status: 'none' as const };
-
+    const isMoney = newAsset.category === 'capital' && newAsset.targetType === 'money';
+    if (isMoney) {
+      const amount = parseFloat(newAsset.targetMoney) || 0;
+      if (amount <= 0) return { daily: 0, monthly: 0, status: 'none' as const };
+      const monthly = amount / (years * 12);
+      return { daily: 0, monthly, status: 'optimal' as const };
+    }
+    const hours = parseFloat(newAsset.target) || 0;
+    if (hours <= 0) return { daily: 0, monthly: 0, status: 'none' as const };
     const daily = hours / (years * 365);
     let status: 'optimal' | 'demanding' | 'high' | 'impossible' = 'optimal';
     if (daily > 10) status = 'impossible';
     else if (daily > 5) status = 'high';
     else if (daily > 2) status = 'demanding';
-
-    return { daily, status };
-  }, [newAsset.target, newAsset.horizon]);
+    return { daily, monthly: 0, status };
+  }, [newAsset.target, newAsset.targetMoney, newAsset.targetType, newAsset.category, newAsset.horizon]);
 
   type RefineSuggestion = {
     assetId: string;
@@ -64,6 +86,7 @@ export default function SanctuaryVaultPage() {
     const downgrade: RefineSuggestion[] = [];
     const extendHorizon: RefineSuggestion[] = [];
     for (const asset of assets) {
+      if ((asset.targetType ?? 'hours') === 'money') continue;
       const ana = assetAnalytics(asset.id);
       if (ana.status === 'critical') {
         const remaining = asset.targetHours - (asset.investedHours || 0);
@@ -206,15 +229,41 @@ export default function SanctuaryVaultPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2 min-w-0">
-                    <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground truncate block">Target (Hours)</Label>
-                    <Input
-                      type="number" value={newAsset.target} placeholder="1000"
-                      className="rounded-full h-12 sm:h-14 bg-muted/50 border border-border dark:border-white/10 px-6 sm:px-8 text-base placeholder:text-muted-foreground"
-                      onChange={(e) => setNewAsset({ ...newAsset, target: e.target.value })}
-                    />
+                {newAsset.category === 'capital' && (
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground truncate block">Goal type</Label>
+                    <Select value={newAsset.targetType} onValueChange={(v) => setNewAsset({ ...newAsset, targetType: v as 'hours' | 'money' })}>
+                      <SelectTrigger className="rounded-full h-12 sm:h-14 bg-muted/50 border border-border dark:border-white/10 px-4 sm:px-6 text-[10px] font-black uppercase tracking-[0.2em]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-[2.5rem] luxury-blur border border-border dark:border-white/10 border-primary/10 bg-card">
+                        <SelectItem value="hours" className="flex items-center gap-2"><Zap size={12} /> Hours (focus)</SelectItem>
+                        <SelectItem value="money" className="flex items-center gap-2"><Banknote size={12} /> Money (savings)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {newAsset.category === 'capital' && newAsset.targetType === 'money' ? (
+                    <div className="space-y-2 min-w-0">
+                      <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground truncate block">Target (€)</Label>
+                      <Input
+                        type="number" value={newAsset.targetMoney} placeholder="5000"
+                        className="rounded-full h-12 sm:h-14 bg-muted/50 border border-border dark:border-white/10 px-6 sm:px-8 text-base placeholder:text-muted-foreground"
+                        onChange={(e) => setNewAsset({ ...newAsset, targetMoney: e.target.value })}
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2 min-w-0">
+                      <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground truncate block">Target (Hours)</Label>
+                      <Input
+                        type="number" value={newAsset.target} placeholder="1000"
+                        className="rounded-full h-12 sm:h-14 bg-muted/50 border border-border dark:border-white/10 px-6 sm:px-8 text-base placeholder:text-muted-foreground"
+                        onChange={(e) => setNewAsset({ ...newAsset, target: e.target.value })}
+                      />
+                    </div>
+                  )}
                   <div className="space-y-2 min-w-0">
                     <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground truncate block">Horizon</Label>
                     <Select value={newAsset.horizon} onValueChange={(v) => setNewAsset({ ...newAsset, horizon: v })}>
@@ -242,8 +291,8 @@ export default function SanctuaryVaultPage() {
                       <p className="text-[10px] font-black uppercase tracking-[0.4em]">Viability Audit</p>
                     </div>
                     <p className="text-2xl font-light tabular-nums leading-tight">
-                      {viability.daily.toFixed(1)}h
-                      <span className="text-[10px] ml-2 opacity-40 uppercase tracking-[0.2em]">Required Daily</span>
+                      {viability.daily > 0 ? `${viability.daily.toFixed(1)}h` : `${viability.monthly.toFixed(0)} €`}
+                      <span className="text-[10px] ml-2 opacity-40 uppercase tracking-[0.2em]">{viability.daily > 0 ? 'Required Daily' : 'per month (avg)'}</span>
                     </p>
                     <p className="text-[8px] font-bold uppercase tracking-[0.2em] opacity-30 mt-2">
                       {viability.status === 'impossible' ? "TACTICAL FAILURE: PHYSICAL LIMIT REACHED" :
@@ -253,9 +302,53 @@ export default function SanctuaryVaultPage() {
                   </div>
                 )}
 
+                {viability.monthly > 0 && viability.daily === 0 && (
+                  <div className="p-6 rounded-[2rem] border bg-primary/5 border-primary/20">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Banknote className="text-primary" size={16} />
+                      <p className="text-[10px] font-black uppercase tracking-[0.4em]">Suggested savings</p>
+                    </div>
+                    <p className="text-2xl font-light tabular-nums leading-tight">
+                      {viability.monthly.toFixed(0)} €
+                      <span className="text-[10px] ml-2 opacity-40 uppercase tracking-[0.2em]">per month</span>
+                    </p>
+                  </div>
+                )}
+
+                {newAsset.targetType === 'hours' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2 min-w-0">
+                      <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground block truncate">
+                        <span className="inline-flex items-center gap-1.5"><GitBranch size={10} /> Parent goal</span>
+                      </Label>
+                      <Select value={newAsset.parentAssetId || 'none'} onValueChange={(v) => setNewAsset({ ...newAsset, parentAssetId: v === 'none' ? '' : v })}>
+                        <SelectTrigger className="rounded-full h-12 sm:h-14 bg-muted/50 border border-border dark:border-white/10 w-full min-w-0 max-w-full [&>span]:truncate px-4 sm:px-6 text-[10px] font-black uppercase tracking-[0.2em]">
+                          <SelectValue placeholder="Long-term goal (optional)" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-[2.5rem] luxury-blur border border-border dark:border-white/10 border-primary/10 bg-card max-w-[min(90vw,theme(screens.sm))]">
+                          <SelectItem value="none" className="truncate">None (root goal)</SelectItem>
+                          {assets.filter(a => a.category === newAsset.category && !a.parentAssetId && (a.targetType ?? 'hours') === 'hours').map(a => (
+                            <SelectItem key={a.id} value={a.id} className="truncate">{a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2 min-w-0">
+                      <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground flex items-center gap-1.5">
+                        <Flag size={10} /> Step order
+                      </Label>
+                      <Input
+                        type="number" min={1} value={newAsset.stepOrder} placeholder="1"
+                        className="rounded-full h-12 sm:h-14 bg-muted/50 border border-border dark:border-white/10 px-6 w-full"
+                        onChange={(e) => setNewAsset({ ...newAsset, stepOrder: e.target.value || '1' })}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <button
                   onClick={handleAdd}
-                  disabled={viability.status === 'impossible'}
+                  disabled={viability.status === 'impossible' || (newAsset.category === 'capital' && newAsset.targetType === 'money' && !(parseFloat(newAsset.targetMoney) > 0))}
                   className={cn(
                     "w-full h-20 mt-6 rounded-full text-[11px] font-black uppercase tracking-[1em] transition-all luxury-shadow gold-glow",
                     viability.status === 'impossible' ? "bg-muted/50 text-muted-foreground cursor-not-allowed dark:bg-white/5 dark:text-white/10" : "bg-foreground text-background hover:bg-primary active:scale-95"
@@ -272,6 +365,15 @@ export default function SanctuaryVaultPage() {
           const pillarAssets = assets.filter(a => a.category === pillar.id);
           if (pillarAssets.length === 0) return null;
 
+          const sortedAssets = [...pillarAssets].sort((a, b) => {
+            const aRoot = a.parentAssetId ?? a.id;
+            const bRoot = b.parentAssetId ?? b.id;
+            if (aRoot !== bRoot) return aRoot.localeCompare(bRoot);
+            const orderA = a.stepOrder ?? 0;
+            const orderB = b.stepOrder ?? 0;
+            return orderA - orderB;
+          });
+
           return (
             <div key={pillar.id} className="space-y-8 animate-in slide-in-from-bottom-8 duration-1000">
               <div className="flex items-center gap-4 px-4">
@@ -280,16 +382,27 @@ export default function SanctuaryVaultPage() {
               </div>
 
               <div className="grid gap-6 px-2">
-                {pillarAssets.map(asset => {
+                {sortedAssets.map(asset => {
+                  const isMoney = (asset.targetType ?? 'hours') === 'money';
                   const ana = assetAnalytics(asset.id);
-                  const progress = Math.min(100, (asset.investedHours / asset.targetHours) * 100);
+                  const progress = isMoney
+                    ? (asset.targetAmount && asset.targetAmount > 0 ? Math.min(100, ((asset.investedAmount ?? 0) / asset.targetAmount) * 100) : 0)
+                    : Math.min(100, (asset.targetHours > 0 ? (asset.investedHours / asset.targetHours) * 100 : 0));
+                  const entries = getGoalEntriesForAsset(asset.id);
+                  const isNextStep = !isMoney && getNextStepInPath(pillar.id)?.id === asset.id;
+                  const isChild = !!asset.parentAssetId;
+                  const parentName = asset.parentAssetId ? assets.find(a => a.id === asset.parentAssetId)?.name : null;
 
                   return (
-                    <div key={asset.id} className="luxury-blur p-8 rounded-[3rem] border border-border dark:border-white/5 luxury-shadow bg-muted/40 dark:bg-black/30 relative overflow-hidden group">
+                    <div key={asset.id} className={cn("luxury-blur p-8 rounded-[3rem] border border-border dark:border-white/5 luxury-shadow bg-muted/40 dark:bg-black/30 relative overflow-hidden group", isChild && "ml-4 sm:ml-6 border-l-2 border-l-primary/20")}>
                       <div className="flex justify-between items-start mb-6">
                         <div className="space-y-2">
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-4 flex-wrap">
+                            {isChild && <span className="text-[8px] font-black uppercase opacity-40">Step {asset.stepOrder ?? '?'}</span>}
                             <p className="text-lg font-light">{asset.name}</p>
+                            {parentName && <span className="text-[8px] font-bold uppercase opacity-50">→ {parentName}</span>}
+                            {isNextStep && <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/40">Next step</span>}
+                            {isMoney && <span className="text-[8px] font-black uppercase text-primary opacity-70 flex items-center gap-1"><Banknote size={10} /> €</span>}
                             <span className={cn(
                               "text-[7px] font-black uppercase px-2.5 py-0.5 rounded-full border transition-all duration-500",
                               asset.priority === 'high' ? "border-destructive/40 text-destructive bg-destructive/5 shadow-[0_0_10px_rgba(255,0,0,0.1)]" :
@@ -299,7 +412,9 @@ export default function SanctuaryVaultPage() {
                             </span>
                           </div>
                           <p className="text-[8px] font-black uppercase tracking-[0.4em] opacity-30">
-                            {ana.dailyRequired.toFixed(1)}h Daily / {asset.horizonYears}Y Horizon
+                            {isMoney
+                              ? `${asset.horizonYears}Y Horizon · Avg ${asset.targetAmount ? (asset.targetAmount / (asset.horizonYears * 12)).toFixed(0) : 0} €/mo`
+                              : `${ana.dailyRequired.toFixed(1)}h Daily / ${asset.horizonYears}Y Horizon`}
                           </p>
                         </div>
                         <button onClick={() => deleteAsset(asset.id)} className="p-3 opacity-15 hover:opacity-100 transition-all text-destructive hover:scale-110">
@@ -309,21 +424,25 @@ export default function SanctuaryVaultPage() {
 
                       <div className="space-y-4">
                         <div className="flex justify-between text-[10px] tabular-nums font-medium opacity-40">
-                          <span>{asset.investedHours.toFixed(1)}h / {asset.targetHours}h Invested</span>
+                          {isMoney ? (
+                            <span>{(asset.investedAmount ?? 0).toFixed(0)} € / {(asset.targetAmount ?? 0).toFixed(0)} €</span>
+                          ) : (
+                            <span>{asset.investedHours.toFixed(1)}h / {asset.targetHours}h Invested</span>
+                          )}
                           <span className="gold-glow">{progress.toFixed(1)}%</span>
                         </div>
                         <div className="h-1.5 w-full bg-foreground/5 rounded-full overflow-hidden">
                           <div
                             className={cn(
                               "h-full transition-all duration-1000",
-                              ana.status === 'critical' ? 'bg-destructive shadow-[0_0_10px_rgba(255,0,0,0.3)]' : 'bg-primary gold-glow shadow-[0_0_15px_rgba(212,175,55,0.4)]'
+                              !isMoney && ana.status === 'critical' ? 'bg-destructive shadow-[0_0_10px_rgba(255,0,0,0.3)]' : 'bg-primary gold-glow shadow-[0_0_15px_rgba(212,175,55,0.4)]'
                             )}
                             style={{ width: `${progress}%` }}
                           />
                         </div>
                       </div>
 
-                      {ana.debtHours > 5 && (
+                      {!isMoney && ana.debtHours > 5 && (
                         <div className="mt-4 pt-4 border-t border-border dark:border-white/5 flex items-center justify-between">
                           <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-destructive flex items-center gap-2">
                             <AlertTriangle size={10} /> Strategic Debt: {ana.debtHours.toFixed(1)}h
@@ -334,45 +453,72 @@ export default function SanctuaryVaultPage() {
                         </div>
                       )}
 
-                      <Collapsible defaultOpen={false} className="group">
-                        <CollapsibleTrigger className="mt-4 pt-4 border-t border-border dark:border-white/5 w-full flex items-center justify-between text-left hover:opacity-90 transition-opacity">
-                          <span className="text-[8px] font-black uppercase tracking-[0.4em] opacity-50">
-                            Critical rituals ({(asset.criticalRituals ?? getDefaultCriticalRitualsForPillar(asset.category)).length})
-                          </span>
-                          <ChevronDown size={12} className="opacity-50 transition-transform group-data-[state=open]:rotate-180" />
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <div className="flex flex-wrap gap-2 pt-3">
-                            {ritualDefinitions.map((ritual) => {
-                              const IconComp = RITUAL_ICON_MAP[ritual.icon];
-                              const effectiveRituals = asset.criticalRituals ?? getDefaultCriticalRitualsForPillar(asset.category);
-                              const checked = effectiveRituals.includes(ritual.id);
-                              return (
-                                <label
-                                  key={ritual.id}
-                                  className={cn(
-                                    "flex items-center gap-1.5 cursor-pointer rounded-full px-3 py-1.5 border transition-all",
-                                    checked ? "border-primary/40 bg-primary/5" : "border-border dark:border-white/10 opacity-70 hover:opacity-100"
-                                  )}
-                                >
-                                  <Checkbox
-                                    checked={checked}
-                                    onCheckedChange={() => {
-                                      const next = checked
-                                        ? effectiveRituals.filter((r) => r !== ritual.id)
-                                        : [...effectiveRituals, ritual.id];
-                                      updateAssetCriticalRituals(asset.id, next);
-                                    }}
-                                    className="border-border dark:border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary h-3.5 w-3.5"
-                                  />
-                                  {IconComp && <IconComp size={10} className="opacity-70 shrink-0" />}
-                                  <span className="text-[8px] font-bold uppercase tracking-wider">{ritual.label}</span>
-                                </label>
-                              );
-                            })}
+                      {isMoney && (
+                        <div className="mt-4 pt-4 border-t border-border dark:border-white/5 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[8px] font-black uppercase tracking-[0.4em] opacity-50">Entries ({entries.length})</span>
+                            <button
+                              onClick={() => { setEntryModalAssetId(asset.id); setEntryAmount(''); setEntryNote(''); }}
+                              className="text-[8px] font-bold uppercase tracking-wider text-primary hover:underline"
+                            >
+                              + Add entry
+                            </button>
                           </div>
-                        </CollapsibleContent>
-                      </Collapsible>
+                          {entries.length > 0 && (
+                            <ul className="space-y-2 max-h-32 overflow-y-auto">
+                              {entries.map((e) => (
+                                <li key={e.id} className="flex items-center justify-between text-[10px] py-1.5 px-3 rounded-full bg-muted/30 dark:bg-white/5">
+                                  <span className="tabular-nums">{e.amount.toFixed(0)} €</span>
+                                  <span className="opacity-50">{new Date(e.timestamp).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })}</span>
+                                  <button onClick={() => deleteGoalEntry(e.id)} className="p-1 opacity-40 hover:opacity-100 text-destructive" aria-label="Remove entry"><Trash2 size={10} /></button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+
+                      {!isMoney && (
+                        <Collapsible defaultOpen={false} className="group">
+                          <CollapsibleTrigger className="mt-4 pt-4 border-t border-border dark:border-white/5 w-full flex items-center justify-between text-left hover:opacity-90 transition-opacity">
+                            <span className="text-[8px] font-black uppercase tracking-[0.4em] opacity-50">
+                              Critical rituals ({(asset.criticalRituals ?? getDefaultCriticalRitualsForPillar(asset.category)).length})
+                            </span>
+                            <ChevronDown size={12} className="opacity-50 transition-transform group-data-[state=open]:rotate-180" />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="flex flex-wrap gap-2 pt-3">
+                              {ritualDefinitions.map((ritual) => {
+                                const IconComp = RITUAL_ICON_MAP[ritual.icon];
+                                const effectiveRituals = asset.criticalRituals ?? getDefaultCriticalRitualsForPillar(asset.category);
+                                const checked = effectiveRituals.includes(ritual.id);
+                                return (
+                                  <label
+                                    key={ritual.id}
+                                    className={cn(
+                                      "flex items-center gap-1.5 cursor-pointer rounded-full px-3 py-1.5 border transition-all",
+                                      checked ? "border-primary/40 bg-primary/5" : "border-border dark:border-white/10 opacity-70 hover:opacity-100"
+                                    )}
+                                  >
+                                    <Checkbox
+                                      checked={checked}
+                                      onCheckedChange={() => {
+                                        const next = checked
+                                          ? effectiveRituals.filter((r) => r !== ritual.id)
+                                          : [...effectiveRituals, ritual.id];
+                                        updateAssetCriticalRituals(asset.id, next);
+                                      }}
+                                      className="border-border dark:border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary h-3.5 w-3.5"
+                                    />
+                                    {IconComp && <IconComp size={10} className="opacity-70 shrink-0" />}
+                                    <span className="text-[8px] font-bold uppercase tracking-wider">{ritual.label}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      )}
                     </div>
                   );
                 })}
@@ -388,6 +534,54 @@ export default function SanctuaryVaultPage() {
           </div>
         )}
       </section>
+
+      <Dialog open={entryModalAssetId != null} onOpenChange={(open) => !open && setEntryModalAssetId(null)}>
+        <DialogContent className="rounded-[3rem] border border-primary/20 luxury-blur p-6 sm:p-8 bg-card/95 backdrop-blur-3xl max-w-[94vw] sm:max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl luxury-text">Add entry</DialogTitle>
+            <DialogDescription className="text-[9px] uppercase tracking-[0.5em] text-muted-foreground">
+              {entryModalAssetId ? assets.find(a => a.id === entryModalAssetId)?.name : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground">Amount (€)</Label>
+              <Input
+                type="number"
+                value={entryAmount}
+                placeholder="200"
+                className="rounded-full h-12 bg-muted/50 border border-border dark:border-white/10 px-6"
+                onChange={(e) => setEntryAmount(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground">Note (optional)</Label>
+              <Input
+                value={entryNote}
+                placeholder="e.g. monthly deposit"
+                className="rounded-full h-11 bg-muted/50 border border-border dark:border-white/10 px-6"
+                onChange={(e) => setEntryNote(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => { setEntryModalAssetId(null); setEntryAmount(''); setEntryNote(''); }}
+                className="flex-1 py-3 rounded-full border border-border dark:border-white/10 text-[10px] font-bold uppercase tracking-wider"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddEntry}
+                disabled={!entryAmount || !(parseFloat(entryAmount.replace(',', '.')) > 0)}
+                className="flex-1 py-3 rounded-full bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-wider hover:opacity-90 disabled:opacity-50"
+              >
+                Record
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="h-10" />
     </div>
   );

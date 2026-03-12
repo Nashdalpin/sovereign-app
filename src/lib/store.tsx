@@ -33,6 +33,8 @@ export type RitualDefinition = {
   icon: string;
 };
 
+export type AssetTargetType = 'hours' | 'money';
+
 export type Asset = {
   id: string;
   name: string;
@@ -45,6 +47,24 @@ export type Asset = {
   createdAt: string;
   /** Critical rituals for this mandate; ritual ids */
   criticalRituals?: string[];
+  /** When 'money', target is in currency; progress via goal entries */
+  targetType?: AssetTargetType;
+  targetAmount?: number;
+  investedAmount?: number;
+  currency?: string;
+  /** Parent long-term goal; null = root. Baby steps have this set. */
+  parentAssetId?: string | null;
+  /** Order in path (1 = first step) among siblings with same parent */
+  stepOrder?: number | null;
+};
+
+export type GoalEntry = {
+  id: string;
+  assetId: string;
+  amount: number;
+  currency: string;
+  timestamp: string;
+  note?: string | null;
 };
 
 /** Daily state per ritual (id -> checked or not). Keys come from ritualDefinitions. */
@@ -52,6 +72,10 @@ export type Vitals = Record<string, boolean>;
 
 interface AssetStoreContextType {
   assets: Asset[];
+  goalEntries: GoalEntry[];
+  addGoalEntry: (assetId: string, amount: number, note?: string | null) => void;
+  deleteGoalEntry: (id: string) => void;
+  getGoalEntriesForAsset: (assetId: string) => GoalEntry[];
   lifeTracker: {
     activeMode: LifeMode;
     activeAssetId: string | null;
@@ -66,7 +90,7 @@ interface AssetStoreContextType {
   totalInvestment: number;
   dailyTargetHours: number;
   isHydrated: boolean;
-  addAsset: (name: string, category: Pillar, priority: Priority, targetHours: number, horizonYears: 1 | 5 | 10) => void;
+  addAsset: (name: string, category: Pillar, priority: Priority, targetHours: number, horizonYears: 1 | 5 | 10, moneyGoal?: { targetAmount: number; currency?: string }, pathOptions?: { parentAssetId: string; stepOrder: number }) => void;
   deleteAsset: (id: string) => void;
   toggleFocus: (assetId?: string | null) => void;
   updateAssetTasks: (assetId: string, tasks: { title: string, priority: Priority }[]) => void;
@@ -87,6 +111,9 @@ interface AssetStoreContextType {
     status: 'on-track' | 'behind' | 'critical';
   };
   getPriorityAsset: (category: Pillar) => Asset | null;
+  /** Next suggested step in path (baby step or root goal); respects dependency order. */
+  getNextStepInPath: (category: Pillar) => Asset | null;
+  isAssetComplete: (asset: Asset) => boolean;
   completedBlockIndices: number[];
   currentBlockIndex: number | null;
   setCurrentBlockIndex: (index: number | null, suggestedMinutes?: number) => void;
@@ -99,7 +126,7 @@ interface AssetStoreContextType {
   setPillarRituals: (pillar: Pillar, rituals: string[]) => void;
   updateAssetCriticalRituals: (assetId: string, rituals: string[]) => void;
   getDefaultCriticalRitualsForPillar: (pillar: Pillar) => string[];
-  updateAsset: (assetId: string, updates: Partial<Pick<Asset, 'targetHours' | 'horizonYears' | 'priority'>>) => void;
+  updateAsset: (assetId: string, updates: Partial<Pick<Asset, 'targetHours' | 'horizonYears' | 'priority' | 'targetAmount' | 'currency' | 'parentAssetId' | 'stepOrder'>>) => void;
 }
 
 const AssetStoreContext = createContext<AssetStoreContextType | undefined>(undefined);
@@ -110,6 +137,10 @@ function getDefaultFocoContext(): AssetStoreContextType {
   const now = Date.now();
   return {
     assets: [],
+    goalEntries: [],
+    addGoalEntry: noop,
+    deleteGoalEntry: noop,
+    getGoalEntriesForAsset: () => [],
     lifeTracker: { activeMode: 'passive', activeAssetId: null, stateStartTime: now, todayFocusSecs: 0 },
     vitals: {},
     ritualDefinitions: DEFAULT_RITUAL_DEFINITIONS,
@@ -133,6 +164,8 @@ function getDefaultFocoContext(): AssetStoreContextType {
     currentVitality: 0,
     assetAnalytics: () => ({ dailyRequired: 0, initialDailyRequired: 0, urgencyFactor: 1, debtHours: 0, status: 'on-track' as const }),
     getPriorityAsset: () => null,
+    getNextStepInPath: () => null,
+    isAssetComplete: () => false,
     completedBlockIndices: [],
     currentBlockIndex: null,
     setCurrentBlockIndex: noop,
@@ -181,6 +214,7 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
     todayFocusSecs: 0
   });
   const [sessionLogs, setSessionLogs] = useState<SessionLog[]>([]);
+  const [goalEntries, setGoalEntries] = useState<GoalEntry[]>([]);
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [completedBlockIndices, setCompletedBlockIndices] = useState<number[]>([]);
   const [currentBlockIndex, setCurrentBlockIndexState] = useState<number | null>(null);
@@ -220,8 +254,17 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
         try {
           if (res?.ok) {
             const data = await res.json();
-            setAssets(data.assets ?? []);
+            setAssets((data.assets ?? []).map((a: Record<string, unknown>) => ({
+              ...a,
+              targetType: a.targetType ?? 'hours',
+              targetAmount: a.targetAmount != null ? Number(a.targetAmount) : undefined,
+              investedAmount: a.investedAmount != null ? Number(a.investedAmount) : undefined,
+              currency: a.currency ?? undefined,
+              parentAssetId: a.parentAssetId ?? undefined,
+              stepOrder: a.stepOrder != null ? Number(a.stepOrder) : undefined,
+            })));
             setSessionLogs(data.sessionLogs ?? []);
+            setGoalEntries(data.goalEntries ?? []);
             const defs = (data.appState?.ritualDefinitions && Array.isArray(data.appState.ritualDefinitions) && data.appState.ritualDefinitions.length > 0)
               ? data.appState.ritualDefinitions
               : DEFAULT_RITUAL_DEFINITIONS;
@@ -260,8 +303,17 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
           try {
             const data = JSON.parse(saved);
             const todayStr = new Date(now).toDateString();
-            setAssets(data.assets || []);
+            setAssets((data.assets || []).map((a: Record<string, unknown>) => ({
+              ...a,
+              targetType: a.targetType ?? 'hours',
+              targetAmount: a.targetAmount != null ? Number(a.targetAmount) : undefined,
+              investedAmount: a.investedAmount != null ? Number(a.investedAmount) : undefined,
+              currency: a.currency ?? undefined,
+              parentAssetId: a.parentAssetId ?? undefined,
+              stepOrder: a.stepOrder != null ? Number(a.stepOrder) : undefined,
+            })));
             setSessionLogs(data.sessionLogs || []);
+            setGoalEntries(data.goalEntries || []);
             const defs = (data.ritualDefinitions && Array.isArray(data.ritualDefinitions) && data.ritualDefinitions.length > 0)
               ? data.ritualDefinitions
               : DEFAULT_RITUAL_DEFINITIONS;
@@ -305,6 +357,7 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
       const payload = {
         assets,
         sessionLogs,
+        goalEntries,
         lifeTracker,
         vitals,
         ritualDefinitions,
@@ -326,13 +379,14 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
       });
     }, 1500);
     return () => { if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current); };
-  }, [isHydrated, userId, assets, sessionLogs, lifeTracker, vitals, ritualDefinitions, completedBlockIndices, currentBlockIndex, currentBlockSuggestedMinutes, pillarRitualsConfig]);
+  }, [isHydrated, userId, assets, sessionLogs, goalEntries, lifeTracker, vitals, ritualDefinitions, completedBlockIndices, currentBlockIndex, currentBlockSuggestedMinutes, pillarRitualsConfig]);
 
   useEffect(() => {
     if (!isHydrated || userId) return;
     const data = {
       assets,
       sessionLogs,
+      goalEntries,
       lifeTracker,
       vitals,
       ritualDefinitions,
@@ -343,7 +397,7 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
       pillarRitualsConfig
     };
     localStorage.setItem('sovereign_v5', JSON.stringify(data));
-  }, [assets, sessionLogs, lifeTracker, vitals, ritualDefinitions, isHydrated, userId, completedBlockIndices, currentBlockIndex, currentBlockSuggestedMinutes, pillarRitualsConfig]);
+  }, [assets, sessionLogs, goalEntries, lifeTracker, vitals, ritualDefinitions, isHydrated, userId, completedBlockIndices, currentBlockIndex, currentBlockSuggestedMinutes, pillarRitualsConfig]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
@@ -369,6 +423,10 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
   const assetAnalytics = useCallback((assetId: string) => {
     const asset = assets.find(a => a.id === assetId);
     if (!asset || !isHydrated) return { dailyRequired: 0, initialDailyRequired: 0, urgencyFactor: 1, debtHours: 0, status: 'on-track' as const };
+
+    if (asset.targetType === 'money') {
+      return { dailyRequired: 0, initialDailyRequired: 0, urgencyFactor: 1, debtHours: 0, status: 'on-track' as const };
+    }
 
     const totalDays = asset.horizonYears * 365;
     const createdAt = new Date(asset.createdAt);
@@ -414,32 +472,62 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
     [intensityRequired]
   );
 
+  const isAssetComplete = (asset: Asset): boolean => {
+    if ((asset.targetType ?? 'hours') === 'money') {
+      const target = asset.targetAmount ?? 0;
+      return target > 0 && (asset.investedAmount ?? 0) >= target;
+    }
+    return asset.targetHours > 0 && asset.investedHours >= asset.targetHours;
+  };
+
+  const getNextStepInPath = (category: Pillar): Asset | null => {
+    const hoursAssets = assets.filter(
+      (a) => a.category === category && (a.targetType ?? 'hours') === 'hours' && a.investedHours < a.targetHours
+    );
+    const eligible = hoursAssets.filter((a) => {
+      if (!a.parentAssetId) return true;
+      const parent = assets.find((p) => p.id === a.parentAssetId);
+      return parent ? isAssetComplete(parent) : true;
+    });
+    if (eligible.length === 0) return null;
+    eligible.sort((a, b) => {
+      const parentA = a.parentAssetId ?? a.id;
+      const parentB = b.parentAssetId ?? b.id;
+      if (parentA !== parentB) return parentA.localeCompare(parentB);
+      const orderA = a.stepOrder ?? 0;
+      const orderB = b.stepOrder ?? 0;
+      if (orderA !== orderB) return orderA - orderB;
+      const pA = PRIORITY_ORDER.indexOf(a.priority);
+      const pB = PRIORITY_ORDER.indexOf(b.priority);
+      if (pA !== pB) return pA - pB;
+      const anaA = assetAnalytics(a.id);
+      const anaB = assetAnalytics(b.id);
+      return anaB.urgencyFactor - anaA.urgencyFactor;
+    });
+    return eligible[0] ?? null;
+  };
+
   const getPriorityAsset = (category: Pillar) => {
-    // ALPHA URGENCY LOGIC:
-    // 1. User priority (High > Medium > Low)
-    // 2. Urgency factor (the more behind, the more focus)
-    // 3. Strategic debt in hours (whales before small fish)
+    const pathNext = getNextStepInPath(category);
+    if (pathNext) return pathNext;
+    // Fallback: ALPHA URGENCY (no path or all path steps complete)
     return [...assets]
-      .filter(a => a.category === category && a.investedHours < a.targetHours)
+      .filter(a => a.category === category && (a.targetType ?? 'hours') === 'hours' && a.investedHours < a.targetHours)
       .sort((a, b) => {
         const pA = PRIORITY_ORDER.indexOf(a.priority);
         const pB = PRIORITY_ORDER.indexOf(b.priority);
         if (pA !== pB) return pA - pB;
-
         const anaA = assetAnalytics(a.id);
         const anaB = assetAnalytics(b.id);
-        
-        if (Math.abs(anaA.urgencyFactor - anaB.urgencyFactor) > 0.05) {
-          return anaB.urgencyFactor - anaA.urgencyFactor;
-        }
-
+        if (Math.abs(anaA.urgencyFactor - anaB.urgencyFactor) > 0.05) return anaB.urgencyFactor - anaA.urgencyFactor;
         return anaB.debtHours - anaA.debtHours;
       })[0] || null;
   };
 
   const getCriticalAsset = () => {
-    if (assets.length === 0) return null;
-    return [...assets].sort((a, b) => {
+    const hoursAssets = assets.filter(a => (a.targetType ?? 'hours') === 'hours');
+    if (hoursAssets.length === 0) return null;
+    return [...hoursAssets].sort((a, b) => {
       const pA = PRIORITY_ORDER.indexOf(a.priority);
       const pB = PRIORITY_ORDER.indexOf(b.priority);
       if (pA !== pB) return pA - pB;
@@ -513,12 +601,19 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addAsset = (name: string, category: Pillar, priority: Priority, targetHours: number, horizonYears: 1 | 5 | 10) => {
+  const addAsset = (name: string, category: Pillar, priority: Priority, targetHours: number, horizonYears: 1 | 5 | 10, moneyGoal?: { targetAmount: number; currency?: string }, pathOptions?: { parentAssetId: string; stepOrder: number }) => {
+    const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 11);
+    const isMoney = moneyGoal != null && moneyGoal.targetAmount > 0;
     setAssets(prev => [...prev, {
-      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 11),
-      name, category, priority, targetHours, horizonYears,
-      investedHours: 0, dailyTasks: [], createdAt: new Date().toISOString(),
-      criticalRituals: DEFAULT_CRITICAL_RITUALS_BY_PILLAR[category]
+      id,
+      name, category, priority,
+      targetHours: isMoney ? 0 : targetHours,
+      investedHours: 0,
+      horizonYears,
+      dailyTasks: [], createdAt: new Date().toISOString(),
+      criticalRituals: DEFAULT_CRITICAL_RITUALS_BY_PILLAR[category],
+      ...(isMoney ? { targetType: 'money' as const, targetAmount: moneyGoal.targetAmount, investedAmount: 0, currency: moneyGoal.currency ?? 'EUR' } : { targetType: 'hours' as const }),
+      ...(pathOptions ? { parentAssetId: pathOptions.parentAssetId, stepOrder: pathOptions.stepOrder } : {}),
     }]);
   };
 
@@ -537,8 +632,34 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
   };
   const getDefaultCriticalRitualsForPillar = (pillar: Pillar): string[] => DEFAULT_CRITICAL_RITUALS_BY_PILLAR[pillar];
 
-  const updateAsset = (assetId: string, updates: Partial<Pick<Asset, 'targetHours' | 'horizonYears' | 'priority'>>) => {
+  const updateAsset = (assetId: string, updates: Partial<Pick<Asset, 'targetHours' | 'horizonYears' | 'priority' | 'targetAmount' | 'currency' | 'parentAssetId' | 'stepOrder'>>) => {
     setAssets(prev => prev.map(a => a.id === assetId ? { ...a, ...updates } : a));
+  };
+
+  const getGoalEntriesForAsset = (assetId: string) =>
+    [...goalEntries].filter(e => e.assetId === assetId).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  const addGoalEntry = (assetId: string, amount: number, note?: string | null) => {
+    const asset = assets.find(a => a.id === assetId);
+    if (!asset || amount <= 0) return;
+    const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 11);
+    const entry: GoalEntry = {
+      id,
+      assetId,
+      amount,
+      currency: asset.currency ?? 'EUR',
+      timestamp: new Date().toISOString(),
+      note: note ?? null,
+    };
+    setGoalEntries(prev => [...prev, entry]);
+    setAssets(prev => prev.map(a => a.id === assetId ? { ...a, investedAmount: (a.investedAmount ?? 0) + amount } : a));
+  };
+
+  const deleteGoalEntry = (id: string) => {
+    const entry = goalEntries.find(e => e.id === id);
+    if (!entry) return;
+    setGoalEntries(prev => prev.filter(e => e.id !== id));
+    setAssets(prev => prev.map(a => a.id === entry.assetId ? { ...a, investedAmount: Math.max(0, (a.investedAmount ?? 0) - entry.amount) } : a));
   };
 
   const addRitual = (def: RitualDefinition) => {
@@ -586,11 +707,12 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AssetStoreContext.Provider value={{
-      assets, lifeTracker, sessionLogs, totalInvestment, dailyTargetHours, isHydrated, vitals,
+      assets, goalEntries, addGoalEntry, deleteGoalEntry, getGoalEntriesForAsset,
+      lifeTracker, sessionLogs, totalInvestment, dailyTargetHours, isHydrated, vitals,
       ritualDefinitions, addRitual, deleteRitual,
       addAsset, deleteAsset, toggleFocus, updateAssetTasks, toggleTask, toggleVital, dailyStats,
       intensityRequired, isCritical, netInvestableWindow, remainingCycleHours: netInvestableWindow,
-      currentVitality, assetAnalytics, getPriorityAsset,
+      currentVitality, assetAnalytics, getPriorityAsset, getNextStepInPath, isAssetComplete,
       completedBlockIndices, currentBlockIndex, setCurrentBlockIndex, addCompletedBlock, setActiveAssetId, getCriticalAsset,
       currentTime,
       getMissingCriticalRituals,

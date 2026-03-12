@@ -163,12 +163,12 @@ export function SovereignVoice() {
         } else {
           const isNoAudio = result.error === 'AUDIO_GENERATION_FAILED' || result.error === 'NO_AUDIO_GENERATED';
           const message = result.error === 'MISSING_API_KEY'
-            ? 'Diretiva indisponível.'
+            ? 'Directive unavailable.'
             : result.error === 'NO_TEXT_GENERATED'
-              ? 'Diretiva indisponível.'
+              ? 'Directive unavailable.'
               : isNoAudio
-                ? (result as { transcript?: string }).transcript ?? 'Diretiva sem áudio.'
-                : 'Tenta novamente mais tarde.';
+                ? (result as { transcript?: string }).transcript ?? 'No audio in directive.'
+                : 'Try again later.';
           toast({
             title: isNoAudio ? 'DIRECTIVE' : 'DIRECTIVE',
             description: message,
@@ -186,8 +186,8 @@ export function SovereignVoice() {
         toast({
           title: 'DIRECTIVE',
           description: isTimeout
-            ? 'A resposta demorou. Tenta novamente.'
-            : 'Diretiva indisponível. Tenta mais tarde.',
+            ? 'Response timed out. Try again.'
+            : 'Directive unavailable. Try again later.',
           variant: 'elegant',
         });
       }

@@ -4,14 +4,14 @@
 import React from 'react';
 import { useFoco, Pillar } from '@/lib/store';
 import { RITUAL_ICON_MAP } from '@/lib/ritual-icons';
-import { CheckCircle2, Coins, Briefcase, User, ArrowRight, Focus, Gem, Heart } from 'lucide-react';
+import { CheckCircle2, Coins, Briefcase, User, ArrowRight, Focus, Gem, Heart, Banknote } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 import { PILLAR_CONFIG } from '@/lib/constants';
 
 export default function SanctuaryPage() {
-  const { vitals, toggleVital, currentVitality, isHydrated, getPriorityAsset, assetAnalytics, getPillarRituals, ritualDefinitions } = useFoco();
+  const { vitals, toggleVital, currentVitality, isHydrated, getPriorityAsset, assetAnalytics, getPillarRituals, ritualDefinitions, assets } = useFoco();
   const ritualById = Object.fromEntries(ritualDefinitions.map((r) => [r.id, r]));
 
   if (!isHydrated) {
@@ -65,6 +65,7 @@ export default function SanctuaryPage() {
           const alphaMandate = getPriorityAsset(pillar.id);
           const analytics = alphaMandate ? assetAnalytics(alphaMandate.id) : null;
           const progress = alphaMandate ? Math.min(100, (alphaMandate.investedHours / alphaMandate.targetHours) * 100) : 0;
+          const moneyGoals = assets.filter(a => a.category === pillar.id && (a.targetType ?? 'hours') === 'money');
           return (
             <TabsContent key={pillar.id} value={pillar.id} className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
               <div className="text-center space-y-1">
@@ -119,11 +120,39 @@ export default function SanctuaryPage() {
                   </Link>
                 </div>
 
-                {!alphaMandate ? (
+                {!alphaMandate && moneyGoals.length === 0 ? (
                   <Link href="/sanctuary/vault" className="block p-10 text-center opacity-30 border border-dashed border-white/5 rounded-[2.5rem] hover:opacity-100 transition-all bg-white/[0.01]">
                     <Focus size={24} className="mx-auto mb-3 opacity-10" />
                     <p className="text-[9px] font-black uppercase tracking-[0.6em]">Establish Alpha</p>
                   </Link>
+                ) : !alphaMandate && moneyGoals.length > 0 ? (
+                  <div className="space-y-6">
+                    <div className="luxury-blur p-6 rounded-[2.5rem] space-y-6 border border-white/5 luxury-shadow relative overflow-hidden bg-black/40">
+                      <p className="text-[8px] font-black uppercase tracking-[0.4em] opacity-50 flex items-center gap-2">
+                        <Banknote size={12} /> Savings goals
+                      </p>
+                      {moneyGoals.map((m) => {
+                        const pct = (m.targetAmount ?? 0) > 0 ? Math.min(100, ((m.investedAmount ?? 0) / (m.targetAmount ?? 1)) * 100) : 0;
+                        return (
+                          <div key={m.id} className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <p className="text-sm font-light">{m.name}</p>
+                              <span className="text-[9px] tabular-nums text-primary">{pct.toFixed(0)}%</span>
+                            </div>
+                            <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
+                              <div className="h-full bg-primary gold-glow transition-all duration-1000" style={{ width: `${pct}%` }} />
+                            </div>
+                            <p className="text-[8px] tabular-nums opacity-40">{(m.investedAmount ?? 0).toFixed(0)} € / {(m.targetAmount ?? 0).toFixed(0)} €</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <Link href="/sanctuary/vault" className="block">
+                      <button className="w-full h-14 rounded-full border border-primary/40 bg-primary/5 text-primary text-[10px] font-black uppercase tracking-[0.8em] hover:bg-primary hover:text-background transition-all">
+                        Manage in Vault
+                      </button>
+                    </Link>
+                  </div>
                 ) : (
                   <div className="space-y-6">
                     <div className="luxury-blur p-6 rounded-[2.5rem] space-y-6 border border-white/5 luxury-shadow relative overflow-hidden bg-black/40">

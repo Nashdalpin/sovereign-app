@@ -34,8 +34,8 @@ export function AppLayoutContent({ children }: { children: React.ReactNode }) {
       if (Date.now() - lastApiOfflineToastAt.current < API_OFFLINE_TOAST_COOLDOWN_MS) return;
       lastApiOfflineToastAt.current = Date.now();
       toast({
-        title: 'Sem ligação',
-        description: 'Os dados locais serão usados quando possível.',
+        title: 'Offline',
+        description: 'Local data will be used when possible.',
         variant: 'elegant',
       });
     };
@@ -85,16 +85,16 @@ export function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-body selection:bg-primary/30">
-      <header className="min-h-16 h-16 flex items-center justify-between px-6 fixed top-0 w-full z-40 bg-background/80 dark:bg-background/30 backdrop-blur-xl border-b border-border dark:border-white/5 pt-[env(safe-area-inset-top)]">
+      <header className="min-h-16 h-16 flex items-center justify-between px-6 fixed top-0 w-full z-40 bg-background/80 dark:bg-background/70 backdrop-blur-xl border-b border-border dark:border-white/15 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center gap-4">
-          <span className="text-[8px] font-black uppercase tracking-[0.8em] opacity-30 gold-glow">Sovereign</span>
+          <span className="text-[8px] font-black uppercase tracking-[0.8em] text-foreground/80 dark:text-foreground gold-glow">Sovereign</span>
           <SovereignVoice />
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={toggleTheme} aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'} className="opacity-30 hover:opacity-100 transition-all p-2">
+          <button onClick={toggleTheme} aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'} className="text-foreground/70 hover:text-foreground transition-all p-2">
             {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
           </button>
-          <button onClick={handleLogout} aria-label="Sign out" className="opacity-30 hover:opacity-100 transition-all p-2" title="Sign out">
+          <button onClick={handleLogout} aria-label="Sign out" className="text-foreground/70 hover:text-foreground transition-all p-2" title="Sign out">
             <LogOut size={14} />
           </button>
         </div>
@@ -102,7 +102,7 @@ export function AppLayoutContent({ children }: { children: React.ReactNode }) {
       <main className="relative z-10 pt-20 pb-[calc(8rem+env(safe-area-inset-bottom,0px))]">{children}</main>
       
       <nav className="fixed left-1/2 -translate-x-1/2 z-50 w-[94%] max-w-[340px] bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
-        <div className="luxury-blur rounded-full luxury-shadow flex justify-around items-center h-16 px-2 border border-border dark:border-white/10 backdrop-blur-3xl bg-card/90 dark:bg-black/50">
+        <div className="luxury-blur rounded-full luxury-shadow flex justify-around items-center h-16 px-2 border border-border dark:border-white/15 backdrop-blur-3xl bg-card/90 dark:bg-white/[0.08]">
           {NavItems.map((item) => {
             const isActive = item.href === '/' ? pathname === '/' : pathname === item.href || (item.href === '/sanctuary' && pathname.startsWith('/sanctuary'));
             return (
@@ -112,7 +112,7 @@ export function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 aria-label={`Go to ${item.label}`}
                 className={cn(
                   "flex flex-col items-center justify-center flex-1 h-12 rounded-full transition-all duration-500",
-                  isActive ? "text-primary scale-110 gold-glow" : "text-foreground/30 hover:text-foreground/50"
+                  isActive ? "text-primary scale-110 gold-glow" : "text-foreground/60 dark:text-foreground/75 hover:text-foreground/90"
                 )}
               >
                 <item.icon size={18} strokeWidth={isActive ? 2.5 : 1.5} />

@@ -10,12 +10,13 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { Zap, Clock, PieChart, Sparkles } from 'lucide-react';
+import { Zap, Clock, PieChart, Sparkles, Banknote } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { generateWeeklyDebrief } from '@/ai/flows/weekly-debrief-flow';
 import { useToast } from '@/hooks/use-toast';
 
 type PillarHours = Record<Pillar, number>;
+type PillarMoney = Record<Pillar, number>;
 
 function getTodayLogs(sessionLogs: SessionLog[]): SessionLog[] {
   const today = new Date().toDateString();
@@ -217,6 +218,16 @@ export default function LedgerPage() {
     };
   }, [sessionLogs, assets, assetAnalytics, isHydrated]);
 
+  const pillarMoney = useMemo((): PillarMoney => {
+    const out: PillarMoney = { capital: 0, professional: 0, vitality: 0, personal: 0 };
+    assets.forEach((a) => {
+      if ((a.targetType ?? 'hours') === 'money' && (a.investedAmount ?? 0) > 0) {
+        out[a.category] += a.investedAmount ?? 0;
+      }
+    });
+    return out;
+  }, [assets]);
+
   const DEBRIEF_TIMEOUT_MS = 30_000;
 
   const handleGenerateDebrief = async () => {
@@ -245,7 +256,7 @@ export default function LedgerPage() {
       ]);
 
       if (result == null || typeof result !== 'object') {
-        showError('Resposta inválida do servidor. Confirma GEMINI_API_KEY em .env e tenta de novo.');
+        showError('Invalid server response. Check GEMINI_API_KEY in .env and try again.');
         return;
       }
 
@@ -255,20 +266,20 @@ export default function LedgerPage() {
         err = (result as { error?: string }).error;
         summary = (result as { summary?: string }).summary;
       } catch (_) {
-        showError('Erro ao ler a resposta. Tenta de novo.');
+        showError('Error reading response. Try again.');
         return;
       }
 
       if (err === 'MISSING_API_KEY') {
-        showError('Falta GEMINI_API_KEY no servidor. Adiciona em .env ou .env.local e reinicia o servidor.');
+        showError('GEMINI_API_KEY is missing on the server. Add it to .env or .env.local and restart.');
         return;
       }
       if (err === 'QUOTA_EXCEEDED') {
-        showError('Limite da API excedido. Tenta daqui a uns momentos.');
+        showError('API rate limit exceeded. Try again in a moment.');
         return;
       }
       if (err === 'NO_SUMMARY' || err === 'UNKNOWN_ERROR') {
-        showError(err === 'NO_SUMMARY' ? 'O Council não devolveu texto. Tenta outra vez.' : 'Não foi possível gerar o relatório.');
+        showError(err === 'NO_SUMMARY' ? 'Council did not return text. Try again.' : 'Could not generate report.');
         return;
       }
 
@@ -276,15 +287,15 @@ export default function LedgerPage() {
         setDebrief(summary.trim());
         setDebriefError(null);
       } else {
-        showError('Nenhum texto devolvido. Verifica GEMINI_API_KEY em .env e tenta de novo.');
+        showError('No text returned. Check GEMINI_API_KEY in .env and try again.');
       }
     } catch (e) {
       const isTimeout = e instanceof Error && e.message === 'DEBRIEF_TIMEOUT';
       console.error('Weekly Debrief Error', e);
       showError(
         isTimeout
-          ? 'Pedido demorou demasiado. Verifica a ligação e GEMINI_API_KEY em .env.'
-          : 'Não foi possível gerar o relatório. Tenta de novo.'
+          ? 'Request timed out. Check connection and GEMINI_API_KEY in .env.'
+          : 'Could not generate report. Try again.'
       );
     } finally {
       setIsGenerating(false);
@@ -457,10 +468,19 @@ export default function LedgerPage() {
                 <p className="text-[8px] font-bold uppercase tracking-[0.4em] opacity-40">
                   {pillar}
                 </p>
-                <p className="text-sm font-light tabular-nums">
-                  {weeklyStats.pillarHours[pillar].toFixed(1)}
-                  <span className="text-[9px] ml-1 opacity-30">h</span>
-                </p>
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <p className="text-sm font-light tabular-nums">
+                    {weeklyStats.pillarHours[pillar].toFixed(1)}
+                    <span className="text-[9px] ml-1 opacity-30">h</span>
+                  </p>
+                  {pillarMoney[pillar] > 0 && (
+                    <p className="text-sm font-light tabular-nums text-primary flex items-center gap-1">
+                      <Banknote size={12} className="opacity-70" />
+                      {pillarMoney[pillar].toLocaleString('pt-PT', { maximumFractionDigits: 0 })}
+                      <span className="text-[9px] opacity-30">€</span>
+                    </p>
+                  )}
+                </div>
                 <div className="h-1 w-full bg-muted dark:bg-white/5 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-primary/70 gold-glow"
@@ -509,7 +529,7 @@ export default function LedgerPage() {
           </div>
         ) : (
           <p className="text-[9px] opacity-40">
-            Ainda sem relatório. Clica em «Generate Report» acima para o Council analisar a última semana.
+            No report yet. Click «Generate Report» above for the Council to analyze the past week.
           </p>
         )}
       </section>

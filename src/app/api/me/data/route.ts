@@ -10,17 +10,19 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const lastDate = searchParams.get('date') ?? new Date().toDateString();
 
-  const [assetsRes, logsRes, stateRes] = await Promise.all([
+  const [assetsRes, logsRes, entriesRes, stateRes] = await Promise.all([
     supabase.from('assets').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
     supabase.from('session_logs').select('*').eq('user_id', user.id).order('timestamp', { ascending: true }),
+    supabase.from('goal_entries').select('*').eq('user_id', user.id).order('timestamp', { ascending: false }),
     supabase.from('app_state').select('*').eq('user_id', user.id).eq('last_date', lastDate).maybeSingle(),
   ]);
 
   if (assetsRes.error) return NextResponse.json({ error: assetsRes.error.message }, { status: 500 });
   if (logsRes.error) return NextResponse.json({ error: logsRes.error.message }, { status: 500 });
+  if (entriesRes.error) return NextResponse.json({ error: entriesRes.error.message }, { status: 500 });
   if (stateRes.error) return NextResponse.json({ error: stateRes.error.message }, { status: 500 });
 
-  const assets = (assetsRes.data ?? []).map((row) => ({
+  const assets = (assetsRes.data ?? []).map((row: Record<string, unknown>) => ({
     id: row.id,
     name: row.name,
     category: row.category,
@@ -31,6 +33,21 @@ export async function GET(request: Request) {
     dailyTasks: Array.isArray(row.daily_tasks) ? row.daily_tasks : [],
     createdAt: row.created_at,
     criticalRituals: Array.isArray(row.critical_rituals) ? row.critical_rituals : [],
+    targetType: row.target_type ?? 'hours',
+    targetAmount: row.target_amount != null ? Number(row.target_amount) : undefined,
+    investedAmount: row.invested_amount != null ? Number(row.invested_amount) : undefined,
+    currency: row.currency ?? undefined,
+    parentAssetId: row.parent_asset_id ?? undefined,
+    stepOrder: row.step_order != null ? Number(row.step_order) : undefined,
+  }));
+
+  const goalEntries = (entriesRes.data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id,
+    assetId: row.asset_id,
+    amount: Number(row.amount),
+    currency: row.currency ?? 'EUR',
+    timestamp: row.timestamp,
+    note: row.note ?? null,
   }));
 
   const sessionLogs = (logsRes.data ?? []).map((row) => ({
@@ -58,6 +75,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     assets,
     sessionLogs,
+    goalEntries,
     appState,
     lastDate,
   });
@@ -82,6 +100,12 @@ export async function POST(request: Request) {
       dailyTasks: unknown[];
       createdAt?: string;
       criticalRituals?: string[];
+      targetType?: string;
+      targetAmount?: number;
+      investedAmount?: number;
+      currency?: string;
+      parentAssetId?: string | null;
+      stepOrder?: number | null;
     }>;
     sessionLogs?: Array<{
       id?: number;
@@ -90,6 +114,14 @@ export async function POST(request: Request) {
       duration: number;
       timestamp: string;
       mode: string;
+    }>;
+    goalEntries?: Array<{
+      id: string;
+      assetId: string;
+      amount: number;
+      currency: string;
+      timestamp: string;
+      note?: string | null;
     }>;
     lifeTracker?: object;
     vitals?: Record<string, boolean>;
@@ -118,14 +150,38 @@ export async function POST(request: Request) {
         name: a.name,
         category: a.category,
         priority: a.priority,
-        target_hours: a.targetHours,
-        invested_hours: a.investedHours,
+        target_hours: a.targetHours ?? 0,
+        invested_hours: a.investedHours ?? 0,
         horizon_years: a.horizonYears,
         daily_tasks: a.dailyTasks ?? [],
         critical_rituals: a.criticalRituals ?? [],
         created_at: a.createdAt ?? new Date().toISOString(),
+        target_type: a.targetType ?? 'hours',
+        target_amount: a.targetAmount ?? null,
+        invested_amount: a.investedAmount ?? 0,
+        currency: a.currency ?? 'EUR',
+        parent_asset_id: a.parentAssetId ?? null,
+        step_order: a.stepOrder ?? null,
       }));
       const { error: insErr } = await supabase.from('assets').insert(rows);
+      if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
+    }
+  }
+
+  if (body.goalEntries) {
+    const { error: delErr } = await supabase.from('goal_entries').delete().eq('user_id', user.id);
+    if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
+    if (body.goalEntries.length > 0) {
+      const rows = body.goalEntries.map((e) => ({
+        id: e.id,
+        user_id: user.id,
+        asset_id: e.assetId,
+        amount: e.amount,
+        currency: e.currency ?? 'EUR',
+        timestamp: e.timestamp,
+        note: e.note ?? null,
+      }));
+      const { error: insErr } = await supabase.from('goal_entries').insert(rows);
       if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
     }
   }

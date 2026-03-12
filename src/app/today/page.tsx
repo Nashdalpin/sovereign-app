@@ -19,12 +19,14 @@ export default function PresenceAltar() {
   const isFocusing = lifeTracker.activeMode === 'focus';
 
   const criticalAsset = getCriticalAsset();
+  const hoursOnlyAssets = useMemo(() => assets.filter(a => (a.targetType ?? 'hours') === 'hours'), [assets]);
 
   const activeAssetId = useMemo(() => {
     if (isFocusing) return lifeTracker.activeAssetId;
     if (isCritical && criticalAsset) return criticalAsset.id;
-    return lifeTracker.activeAssetId || (criticalAsset ? criticalAsset.id : (assets.length > 0 ? assets[0].id : null));
-  }, [isFocusing, isCritical, criticalAsset, assets, lifeTracker.activeAssetId]);
+    const fallback = hoursOnlyAssets.length > 0 ? hoursOnlyAssets[0].id : null;
+    return lifeTracker.activeAssetId || (criticalAsset ? criticalAsset.id : fallback);
+  }, [isFocusing, isCritical, criticalAsset, hoursOnlyAssets, lifeTracker.activeAssetId]);
 
   // Timer only when SEAL is off. In focus mode uses real clock so it keeps counting even with app minimized.
   const sessionDisplayTime = useMemo(() => {
@@ -42,12 +44,12 @@ export default function PresenceAltar() {
       if (!raw) return;
       const data = JSON.parse(raw) as { blockIndex: number; suggestedAssetId: string; suggestedMinutes: number; totalBlocks: number };
       sessionStorage.removeItem(BLOCK_SESSION_KEY);
-      if (data.suggestedAssetId && assets.some(a => a.id === data.suggestedAssetId)) {
+      if (data.suggestedAssetId && hoursOnlyAssets.some(a => a.id === data.suggestedAssetId)) {
         setActiveAssetId(data.suggestedAssetId);
       }
       setBlockSession({ blockIndex: data.blockIndex, suggestedMinutes: data.suggestedMinutes, totalBlocks: data.totalBlocks });
     } catch (_) {}
-  }, [isHydrated, setActiveAssetId, assets]);
+  }, [isHydrated, setActiveAssetId, hoursOnlyAssets]);
 
   const activeAsset = useMemo(() => assets.find(a => a.id === activeAssetId), [assets, activeAssetId]);
   const activeAnalytics = useMemo(() => activeAsset ? assetAnalytics(activeAsset.id) : null, [activeAsset, assetAnalytics]);
@@ -75,13 +77,16 @@ export default function PresenceAltar() {
     );
   }
 
-  if (assets.length === 0) {
+  if (assets.length === 0 || hoursOnlyAssets.length === 0) {
     return (
       <div className="max-w-screen-sm mx-auto h-[70vh] flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 text-center space-y-12 sm:space-y-16 animate-in fade-in duration-1000">
         <header className="space-y-6">
           <p className="text-[10px] font-black uppercase tracking-[1.2em] opacity-20">Portfolio Void</p>
           <h1 className="text-5xl sm:text-6xl luxury-text">Empty.</h1>
         </header>
+        {hoursOnlyAssets.length === 0 && assets.length > 0 && (
+          <p className="text-[9px] opacity-50 max-w-xs">Add a focus (hours) mandate in the Vault to start Presence.</p>
+        )}
         <Link href="/sanctuary/vault" className="w-full">
           <button className="w-full h-24 rounded-full bg-foreground text-background text-[11px] font-black uppercase tracking-[1em] transition-all luxury-shadow border border-white/5">
             Forge Portfolio
@@ -139,7 +144,7 @@ export default function PresenceAltar() {
               </DropdownMenuTrigger>
               {!isCritical && (
                 <DropdownMenuContent align="center" className="rounded-[3rem] border-white/10 p-3 w-[min(100vw-2rem,320px)] max-w-[320px] luxury-blur luxury-shadow bg-card/95 backdrop-blur-3xl">
-                  {assets.map(asset => (
+                  {hoursOnlyAssets.map(asset => (
                     <DropdownMenuItem 
                       key={asset.id} 
                       onSelect={() => setActiveAssetId(asset.id)}

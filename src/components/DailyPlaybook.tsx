@@ -13,6 +13,7 @@ import {
   Clock,
   Activity,
   CheckCircle2,
+  Banknote,
 } from "lucide-react";
 import Link from "next/link";
 import { PILLAR_CONFIG } from "@/lib/constants";
@@ -48,7 +49,7 @@ export function DailyPlaybook({
   const orderedAssetsForBlocks = useMemo(() => {
     if (assets.length === 0) return [];
     const sorted = [...assets]
-      .filter(a => a.investedHours < a.targetHours)
+      .filter(a => (a.targetType ?? 'hours') === 'hours' && a.investedHours < a.targetHours)
       .sort((a, b) => {
         const pA = ['high', 'medium', 'low'].indexOf(a.priority);
         const pB = ['high', 'medium', 'low'].indexOf(b.priority);
@@ -156,43 +157,64 @@ export function DailyPlaybook({
             const alpha = getPriorityAsset(pillar.id);
             const analytics = alpha ? assetAnalytics(alpha.id) : null;
             const progress = alpha ? Math.min(100, (alpha.investedHours / alpha.targetHours) * 100) : 0;
+            const moneyGoals = assets.filter(a => a.category === pillar.id && (a.targetType ?? 'hours') === 'money');
 
             return (
               <div
                 key={pillar.id}
-                className="luxury-blur p-5 rounded-[2rem] border border-border dark:border-white/5 bg-muted/40 dark:bg-black/25 flex items-center justify-between gap-4"
+                className="luxury-blur p-5 rounded-[2rem] border border-border dark:border-white/5 bg-muted/40 dark:bg-black/25 flex flex-col gap-3"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center bg-muted/60 dark:bg-white/5">
-                    <pillar.icon size={18} className="opacity-70" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold">{pillar.label}</p>
-                    {alpha ? (
-                      <>
-                        <p className="text-[9px] font-black uppercase tracking-[0.4em] opacity-40">
-                          {alpha.name}
-                        </p>
-                        <p className="text-[9px] opacity-40">
-                          {analytics?.dailyRequired.toFixed(1)}h required today
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-[9px] opacity-30">No alpha mandate. Forge one in the Vault.</p>
-                    )}
-                  </div>
-                </div>
-                {alpha && (
-                  <div className="flex flex-col items-end gap-1 min-w-[80px]">
-                    <span className="text-[9px] font-black uppercase tracking-[0.4em] opacity-30">
-                      {progress.toFixed(0)}%
-                    </span>
-                    <div className="w-full h-1 bg-muted dark:bg-white/10 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary gold-glow transition-all duration-1000"
-                        style={{ width: `${progress}%` }}
-                      />
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-muted/60 dark:bg-white/5">
+                      <pillar.icon size={18} className="opacity-70" />
                     </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold">{pillar.label}</p>
+                      {alpha ? (
+                        <>
+                          <p className="text-[9px] font-black uppercase tracking-[0.4em] opacity-40">
+                            {alpha.name}
+                          </p>
+                          <p className="text-[9px] opacity-40">
+                            {analytics?.dailyRequired.toFixed(1)}h required today
+                          </p>
+                        </>
+                      ) : !moneyGoals.length ? (
+                        <p className="text-[9px] opacity-30">No alpha mandate. Forge one in the Vault.</p>
+                      ) : null}
+                    </div>
+                  </div>
+                  {alpha && (
+                    <div className="flex flex-col items-end gap-1 min-w-[80px]">
+                      <span className="text-[9px] font-black uppercase tracking-[0.4em] opacity-30">
+                        {progress.toFixed(0)}%
+                      </span>
+                      <div className="w-full h-1 bg-muted dark:bg-white/10 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary gold-glow transition-all duration-1000"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {moneyGoals.length > 0 && (
+                  <div className="pt-2 border-t border-border dark:border-white/5 space-y-1.5">
+                    <p className="text-[8px] font-black uppercase tracking-[0.4em] opacity-50 flex items-center gap-1.5">
+                      <Banknote size={10} /> Savings
+                    </p>
+                    {moneyGoals.map((m) => {
+                      const pct = (m.targetAmount ?? 0) > 0 ? Math.min(100, ((m.investedAmount ?? 0) / (m.targetAmount ?? 1)) * 100) : 0;
+                      return (
+                        <div key={m.id} className="flex justify-between items-center text-[9px]">
+                          <span className="opacity-70 truncate">{m.name}</span>
+                          <span className="tabular-nums text-primary opacity-90">
+                            {(m.investedAmount ?? 0).toFixed(0)} / {(m.targetAmount ?? 0).toFixed(0)} € ({pct.toFixed(0)}%)
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

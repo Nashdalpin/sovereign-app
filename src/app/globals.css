@@ -27,24 +27,24 @@
   }
 
   .dark {
-    --background: 0 0% 2%; /* Obsidian Deep */
-    --foreground: 0 0% 98%;
-    --card: 0 0% 4%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 4%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 45 70% 55%; /* Luminous Champagne Gold */
-    --primary-foreground: 0 0% 5%;
-    --secondary: 0 0% 8%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 10%;
-    --muted-foreground: 0 0% 50%;
-    --accent: 45 40% 10%;
-    --accent-foreground: 45 70% 80%;
-    --destructive: 0 70% 45%;
+    --background: 0 0% 7%;
+    --foreground: 0 0% 96%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 96%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 45 70% 55%;
+    --primary-foreground: 0 0% 8%;
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 68%;
+    --accent: 45 40% 14%;
+    --accent-foreground: 45 70% 85%;
+    --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 10%;
-    --input: 0 0% 10%;
+    --border: 0 0% 18%;
+    --input: 0 0% 14%;
     --ring: 45 70% 55%;
   }
 }
@@ -76,11 +76,11 @@
 }
 
 .luxury-blur {
-  @apply backdrop-blur-[40px] bg-card/90 border border-border dark:bg-black/40 dark:border-white/5;
+  @apply backdrop-blur-[40px] bg-card/90 border border-border dark:bg-white/[0.06] dark:border-white/15;
 }
 
 .luxury-text {
-  @apply bg-clip-text text-transparent bg-gradient-to-b from-foreground via-foreground to-foreground/50;
+  @apply bg-clip-text text-transparent bg-gradient-to-b from-foreground via-foreground to-foreground/70;
 }
 
 .gold-glow {
@@ -99,3 +99,9 @@
   width: 0;
   height: 0;
 }
+
+/* Dark: improve readability of low-opacity text in main content */
+.dark main .opacity-10 { opacity: 0.28; }
+.dark main .opacity-20 { opacity: 0.45; }
+.dark main .opacity-30 { opacity: 0.58; }
+.dark main .opacity-40 { opacity: 0.7; }
