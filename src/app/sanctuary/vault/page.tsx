@@ -112,7 +112,7 @@ export default function SanctuaryVaultPage() {
           </Link>
           <Link
             href="/sanctuary/config"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-full border border-white/15 bg-white/[0.02] hover:bg-white/5 hover:border-primary/30 text-[8px] font-bold uppercase tracking-[0.4em] opacity-70 hover:opacity-100 transition-all"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-full border border-border dark:border-white/15 bg-muted/30 dark:bg-white/[0.02] hover:bg-muted/50 dark:hover:bg-white/5 hover:border-primary/30 text-[8px] font-bold uppercase tracking-[0.4em] opacity-70 hover:opacity-100 transition-all"
           >
             <Settings size={12} strokeWidth={1.5} />
             Configure Altar
@@ -134,7 +134,7 @@ export default function SanctuaryVaultPage() {
             {refineSuggestions.map((s) => (
               <div
                 key={`${s.assetId}-${s.type}-${s.label}`}
-                className="luxury-blur p-6 rounded-[2rem] border border-white/5 bg-black/20 flex flex-wrap items-center justify-between gap-4"
+                className="luxury-blur p-6 rounded-[2rem] border border-border dark:border-white/5 bg-muted/40 dark:bg-black/20 flex flex-wrap items-center justify-between gap-4"
               >
                 <div className="space-y-1">
                   <p className="text-sm font-medium">{s.asset.name}</p>
@@ -174,7 +174,7 @@ export default function SanctuaryVaultPage() {
                   <Input
                     value={newAsset.name}
                     placeholder="E.g., Quantum Growth"
-                    className="rounded-full h-12 sm:h-14 bg-muted/50 border border-white/10 dark:border-white/10 px-6 sm:px-8 text-base placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/30"
+                    className="rounded-full h-12 sm:h-14 bg-muted/50 border border-border dark:border-white/10 px-6 sm:px-8 text-base placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/30"
                     onChange={(e) => setNewAsset({ ...newAsset, name: e.target.value })}
                   />
                 </div>
@@ -183,10 +183,10 @@ export default function SanctuaryVaultPage() {
                   <div className="space-y-2 min-w-0">
                     <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground truncate block">Pillar</Label>
                     <Select value={newAsset.category} onValueChange={(v) => setNewAsset({ ...newAsset, category: v as Pillar })}>
-                      <SelectTrigger className="rounded-full h-12 sm:h-14 bg-muted/50 border border-white/10 min-w-0 [&>span]:truncate px-4 sm:px-6 text-[10px] font-black uppercase tracking-[0.2em]">
+                      <SelectTrigger className="rounded-full h-12 sm:h-14 bg-muted/50 border border-border dark:border-white/10 min-w-0 [&>span]:truncate px-4 sm:px-6 text-[10px] font-black uppercase tracking-[0.2em]">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="rounded-[2.5rem] luxury-blur border border-white/10 border-primary/10 bg-card">
+                      <SelectContent className="rounded-[2.5rem] luxury-blur border border-border dark:border-white/10 border-primary/10 bg-card">
                         {PILLAR_CONFIG.map(p => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -194,10 +194,10 @@ export default function SanctuaryVaultPage() {
                   <div className="space-y-2 min-w-0">
                     <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground truncate block">Priority</Label>
                     <Select value={newAsset.priority} onValueChange={(v) => setNewAsset({ ...newAsset, priority: v as Priority })}>
-                      <SelectTrigger className="rounded-full h-12 sm:h-14 bg-muted/50 border border-white/10 min-w-0 [&>span]:truncate px-4 sm:px-6 text-[10px] font-black uppercase tracking-[0.2em]">
+                      <SelectTrigger className="rounded-full h-12 sm:h-14 bg-muted/50 border border-border dark:border-white/10 min-w-0 [&>span]:truncate px-4 sm:px-6 text-[10px] font-black uppercase tracking-[0.2em]">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="rounded-[2.5rem] luxury-blur border border-white/10 border-primary/10 bg-card">
+                      <SelectContent className="rounded-[2.5rem] luxury-blur border border-border dark:border-white/10 border-primary/10 bg-card">
                         <SelectItem value="high" className="text-destructive">Alpha</SelectItem>
                         <SelectItem value="medium" className="text-primary">Beta</SelectItem>
                         <SelectItem value="low">Gamma</SelectItem>
@@ -211,17 +211,17 @@ export default function SanctuaryVaultPage() {
                     <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground truncate block">Target (Hours)</Label>
                     <Input
                       type="number" value={newAsset.target} placeholder="1000"
-                      className="rounded-full h-12 sm:h-14 bg-muted/50 border border-white/10 px-6 sm:px-8 text-base placeholder:text-muted-foreground"
+                      className="rounded-full h-12 sm:h-14 bg-muted/50 border border-border dark:border-white/10 px-6 sm:px-8 text-base placeholder:text-muted-foreground"
                       onChange={(e) => setNewAsset({ ...newAsset, target: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2 min-w-0">
                     <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground truncate block">Horizon</Label>
                     <Select value={newAsset.horizon} onValueChange={(v) => setNewAsset({ ...newAsset, horizon: v })}>
-                      <SelectTrigger className="rounded-full h-12 sm:h-14 bg-muted/50 border border-white/10 min-w-0 [&>span]:truncate px-4 sm:px-6 text-[10px] font-black uppercase tracking-[0.2em]">
+                      <SelectTrigger className="rounded-full h-12 sm:h-14 bg-muted/50 border border-border dark:border-white/10 min-w-0 [&>span]:truncate px-4 sm:px-6 text-[10px] font-black uppercase tracking-[0.2em]">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="rounded-[2.5rem] luxury-blur border border-white/10 border-primary/10 bg-card">
+                      <SelectContent className="rounded-[2.5rem] luxury-blur border border-border dark:border-white/10 border-primary/10 bg-card">
                         <SelectItem value="1">1 Year</SelectItem>
                         <SelectItem value="5">5 Years</SelectItem>
                         <SelectItem value="10">10 Years</SelectItem>
@@ -258,7 +258,7 @@ export default function SanctuaryVaultPage() {
                   disabled={viability.status === 'impossible'}
                   className={cn(
                     "w-full h-20 mt-6 rounded-full text-[11px] font-black uppercase tracking-[1em] transition-all luxury-shadow gold-glow",
-                    viability.status === 'impossible' ? "bg-white/5 text-white/10 cursor-not-allowed" : "bg-foreground text-background hover:bg-primary active:scale-95"
+                    viability.status === 'impossible' ? "bg-muted/50 text-muted-foreground cursor-not-allowed dark:bg-white/5 dark:text-white/10" : "bg-foreground text-background hover:bg-primary active:scale-95"
                   )}
                 >
                   Seal Mandate
@@ -285,7 +285,7 @@ export default function SanctuaryVaultPage() {
                   const progress = Math.min(100, (asset.investedHours / asset.targetHours) * 100);
 
                   return (
-                    <div key={asset.id} className="luxury-blur p-8 rounded-[3rem] border border-white/5 luxury-shadow bg-black/30 relative overflow-hidden group">
+                    <div key={asset.id} className="luxury-blur p-8 rounded-[3rem] border border-border dark:border-white/5 luxury-shadow bg-muted/40 dark:bg-black/30 relative overflow-hidden group">
                       <div className="flex justify-between items-start mb-6">
                         <div className="space-y-2">
                           <div className="flex items-center gap-4">
@@ -293,7 +293,7 @@ export default function SanctuaryVaultPage() {
                             <span className={cn(
                               "text-[7px] font-black uppercase px-2.5 py-0.5 rounded-full border transition-all duration-500",
                               asset.priority === 'high' ? "border-destructive/40 text-destructive bg-destructive/5 shadow-[0_0_10px_rgba(255,0,0,0.1)]" :
-                              asset.priority === 'medium' ? "border-primary/40 text-primary bg-primary/5" : "border-white/10 opacity-30"
+                              asset.priority === 'medium' ? "border-primary/40 text-primary bg-primary/5" : "border-border dark:border-white/10 opacity-30"
                             )}>
                               {asset.priority === 'high' ? 'Alpha' : asset.priority === 'medium' ? 'Beta' : 'Gamma'}
                             </span>
@@ -324,7 +324,7 @@ export default function SanctuaryVaultPage() {
                       </div>
 
                       {ana.debtHours > 5 && (
-                        <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+                        <div className="mt-4 pt-4 border-t border-border dark:border-white/5 flex items-center justify-between">
                           <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-destructive flex items-center gap-2">
                             <AlertTriangle size={10} /> Strategic Debt: {ana.debtHours.toFixed(1)}h
                           </p>
@@ -335,7 +335,7 @@ export default function SanctuaryVaultPage() {
                       )}
 
                       <Collapsible defaultOpen={false} className="group">
-                        <CollapsibleTrigger className="mt-4 pt-4 border-t border-white/5 w-full flex items-center justify-between text-left hover:opacity-90 transition-opacity">
+                        <CollapsibleTrigger className="mt-4 pt-4 border-t border-border dark:border-white/5 w-full flex items-center justify-between text-left hover:opacity-90 transition-opacity">
                           <span className="text-[8px] font-black uppercase tracking-[0.4em] opacity-50">
                             Critical rituals ({(asset.criticalRituals ?? getDefaultCriticalRitualsForPillar(asset.category)).length})
                           </span>
@@ -352,7 +352,7 @@ export default function SanctuaryVaultPage() {
                                   key={ritual.id}
                                   className={cn(
                                     "flex items-center gap-1.5 cursor-pointer rounded-full px-3 py-1.5 border transition-all",
-                                    checked ? "border-primary/40 bg-primary/5" : "border-white/10 opacity-70 hover:opacity-100"
+                                    checked ? "border-primary/40 bg-primary/5" : "border-border dark:border-white/10 opacity-70 hover:opacity-100"
                                   )}
                                 >
                                   <Checkbox
@@ -363,7 +363,7 @@ export default function SanctuaryVaultPage() {
                                         : [...effectiveRituals, ritual.id];
                                       updateAssetCriticalRituals(asset.id, next);
                                     }}
-                                    className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary h-3.5 w-3.5"
+                                    className="border-border dark:border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary h-3.5 w-3.5"
                                   />
                                   {IconComp && <IconComp size={10} className="opacity-70 shrink-0" />}
                                   <span className="text-[8px] font-bold uppercase tracking-wider">{ritual.label}</span>
@@ -382,7 +382,7 @@ export default function SanctuaryVaultPage() {
         })}
 
         {assets.length === 0 && (
-          <div className="py-24 text-center opacity-10 border border-dashed border-white/10 rounded-[3rem] flex flex-col items-center gap-6">
+          <div className="py-24 text-center opacity-30 dark:opacity-10 border border-dashed border-border dark:border-white/10 rounded-[3rem] flex flex-col items-center gap-6">
             <Gem size={40} strokeWidth={1} />
             <p className="text-[10px] font-black uppercase tracking-[1em]">Portfolio Vault Empty</p>
           </div>

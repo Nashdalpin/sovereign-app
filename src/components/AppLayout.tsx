@@ -85,7 +85,7 @@ export function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-body selection:bg-primary/30">
-      <header className="min-h-16 h-16 flex items-center justify-between px-6 fixed top-0 w-full z-40 bg-background/30 backdrop-blur-xl border-b border-white/5 pt-[env(safe-area-inset-top)]">
+      <header className="min-h-16 h-16 flex items-center justify-between px-6 fixed top-0 w-full z-40 bg-background/80 dark:bg-background/30 backdrop-blur-xl border-b border-border dark:border-white/5 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center gap-4">
           <span className="text-[8px] font-black uppercase tracking-[0.8em] opacity-30 gold-glow">Sovereign</span>
           <SovereignVoice />
@@ -102,7 +102,7 @@ export function AppLayoutContent({ children }: { children: React.ReactNode }) {
       <main className="relative z-10 pt-20 pb-[calc(8rem+env(safe-area-inset-bottom,0px))]">{children}</main>
       
       <nav className="fixed left-1/2 -translate-x-1/2 z-50 w-[94%] max-w-[340px] bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
-        <div className="luxury-blur rounded-full luxury-shadow flex justify-around items-center h-16 px-2 border border-white/10 backdrop-blur-3xl bg-black/50">
+        <div className="luxury-blur rounded-full luxury-shadow flex justify-around items-center h-16 px-2 border border-border dark:border-white/10 backdrop-blur-3xl bg-card/90 dark:bg-black/50">
           {NavItems.map((item) => {
             const isActive = item.href === '/' ? pathname === '/' : pathname === item.href || (item.href === '/sanctuary' && pathname.startsWith('/sanctuary'));
             return (

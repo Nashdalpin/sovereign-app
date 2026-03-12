@@ -406,7 +406,7 @@ export default function LedgerPage() {
                 className={cn(
                   "w-2 h-2 rounded-[2px] transition-all duration-500",
                   lvl === 0
-                    ? "bg-white/[0.03]"
+                    ? "bg-muted/50 dark:bg-white/[0.03]"
                     : lvl === 1
                       ? "bg-primary/20"
                       : lvl === 2
@@ -417,16 +417,16 @@ export default function LedgerPage() {
             ))}
           </div>
         </div>
-        <div className="luxury-blur p-6 rounded-[2.5rem] luxury-shadow border border-white/5 bg-black/40">
+        <div className="luxury-blur p-6 rounded-[2.5rem] luxury-shadow border border-border dark:border-white/5 bg-muted/40 dark:bg-black/40">
           <div className="overflow-x-auto scrollbar-hide">
             <div className="grid grid-flow-col grid-rows-7 gap-1.5 min-w-max">
               {heatmapData.map((day, idx) => (
                 <div
                   key={idx}
                   className={cn(
-                    "w-3.5 h-3.5 rounded-[3px] transition-all duration-700 cursor-default border border-white/[0.02]",
+                    "w-3.5 h-3.5 rounded-[3px] transition-all duration-700 cursor-default border border-border/50 dark:border-white/[0.02]",
                     day.intensity === 0
-                      ? "bg-white/[0.02] hover:bg-white/[0.08]"
+                      ? "bg-muted/50 dark:bg-white/[0.02] hover:bg-muted/70 dark:hover:bg-white/[0.08]"
                       : day.intensity === 1
                         ? "bg-primary/10 hover:bg-primary/20"
                         : day.intensity === 2
@@ -461,7 +461,7 @@ export default function LedgerPage() {
                   {weeklyStats.pillarHours[pillar].toFixed(1)}
                   <span className="text-[9px] ml-1 opacity-30">h</span>
                 </p>
-                <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                <div className="h-1 w-full bg-muted dark:bg-white/5 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-primary/70 gold-glow"
                     style={{
@@ -490,7 +490,7 @@ export default function LedgerPage() {
             className={cn(
               'inline-flex items-center gap-2 px-4 py-2 rounded-full border text-[9px] font-black uppercase tracking-[0.5em] transition-all',
               isGenerating
-                ? 'border-white/10 opacity-40'
+                ? 'border-border dark:border-white/10 opacity-40'
                 : 'border-primary/40 text-primary bg-primary/5 hover:bg-primary hover:text-background'
             )}
             disabled={isGenerating}
@@ -504,7 +504,7 @@ export default function LedgerPage() {
             {debriefError}
           </div>
         ) : debrief ? (
-          <div className="luxury-blur p-6 rounded-[2rem] border border-white/10 bg-black/40 text-sm leading-relaxed">
+          <div className="luxury-blur p-6 rounded-[2rem] border border-border dark:border-white/10 bg-muted/40 dark:bg-black/40 text-sm leading-relaxed">
             {debrief}
           </div>
         ) : (

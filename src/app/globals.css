@@ -4,25 +4,25 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 5%;
-    --card: 0 0% 98%;
-    --card-foreground: 0 0% 5%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 5%;
-    --primary: 45 60% 45%; /* Deep Gold */
+    --background: 0 0% 98%;
+    --foreground: 0 0% 8%;
+    --card: 0 0% 96%;
+    --card-foreground: 0 0% 8%;
+    --popover: 0 0% 98%;
+    --popover-foreground: 0 0% 8%;
+    --primary: 45 52% 40%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 95%;
-    --secondary-foreground: 0 0% 10%;
-    --muted: 0 0% 92%;
-    --muted-foreground: 0 0% 45%;
-    --accent: 45 40% 96%;
-    --accent-foreground: 45 60% 20%;
+    --secondary: 0 0% 92%;
+    --secondary-foreground: 0 0% 12%;
+    --muted: 0 0% 90%;
+    --muted-foreground: 0 0% 42%;
+    --accent: 45 35% 94%;
+    --accent-foreground: 45 55% 22%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 45 60% 45%;
+    --border: 0 0% 82%;
+    --input: 0 0% 85%;
+    --ring: 45 52% 40%;
     --radius: 2.5rem;
   }
 
@@ -76,7 +76,7 @@
 }
 
 .luxury-blur {
-  @apply backdrop-blur-[40px] bg-white/5 dark:bg-black/40 border border-white/5;
+  @apply backdrop-blur-[40px] bg-card/90 border border-border dark:bg-black/40 dark:border-white/5;
 }
 
 .luxury-text {

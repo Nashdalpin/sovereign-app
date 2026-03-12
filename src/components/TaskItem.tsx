@@ -15,10 +15,10 @@ export function TaskItem({ assetId, task }: TaskItemProps) {
 
   return (
     <div className={cn(
-      "flex items-center gap-4 p-4 rounded-2xl transition-all duration-300",
+      "flex items-center gap-4 p-4 rounded-2xl transition-all duration-300 border border-border/50",
       task.completed 
         ? "bg-secondary/30 opacity-60" 
-        : "bg-white hover:shadow-lg hover:shadow-black/5 active:scale-[0.98]"
+        : "bg-card hover:shadow-lg hover:shadow-black/5 active:scale-[0.98]"
     )}>
       <Checkbox
         id={task.id}

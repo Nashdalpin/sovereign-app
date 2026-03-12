@@ -83,7 +83,7 @@ export default function SanctuaryConfigPage() {
         </div>
       </header>
 
-      <section className="luxury-blur p-6 rounded-[2.5rem] border border-white/5 luxury-shadow bg-black/20 space-y-6">
+      <section className="luxury-blur p-6 rounded-[2.5rem] border border-border dark:border-white/5 luxury-shadow bg-muted/40 dark:bg-black/20 space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg luxury-text">Rituals</h2>
           {!showAddForm && (
@@ -99,7 +99,7 @@ export default function SanctuaryConfigPage() {
         </div>
 
         {showAddForm && (
-          <div className="p-4 rounded-[2rem] border border-white/10 space-y-4 animate-in fade-in slide-in-from-top-2">
+          <div className="p-4 rounded-[2rem] border border-border dark:border-white/10 space-y-4 animate-in fade-in slide-in-from-top-2">
             <p className="text-[9px] font-bold uppercase tracking-[0.4em] opacity-50">New ritual</p>
             <div className="grid gap-3">
               <div className="space-y-1">
@@ -108,7 +108,7 @@ export default function SanctuaryConfigPage() {
                   value={newRitual.label}
                   onChange={(e) => setNewRitual((p) => ({ ...p, label: e.target.value }))}
                   placeholder="e.g. Reading"
-                  className="rounded-full h-10 bg-white/[0.04] border-white/10 text-[11px]"
+                  className="rounded-full h-10 bg-muted/30 border-border dark:bg-white/[0.04] dark:border-white/10 text-[11px]"
                 />
               </div>
               <div className="space-y-1">
@@ -117,16 +117,16 @@ export default function SanctuaryConfigPage() {
                   value={newRitual.labelPt}
                   onChange={(e) => setNewRitual((p) => ({ ...p, labelPt: e.target.value }))}
                   placeholder="e.g. Reading"
-                  className="rounded-full h-10 bg-white/[0.04] border-white/10 text-[11px]"
+                  className="rounded-full h-10 bg-muted/30 border-border dark:bg-white/[0.04] dark:border-white/10 text-[11px]"
                 />
               </div>
               <div className="space-y-1">
                 <Label className="text-[8px] uppercase opacity-60">Icon</Label>
                 <Select value={newRitual.icon} onValueChange={(v) => setNewRitual((p) => ({ ...p, icon: v }))}>
-                  <SelectTrigger className="rounded-full h-10 bg-white/[0.04] border-white/10 text-[11px]">
+                  <SelectTrigger className="rounded-full h-10 bg-muted/30 border-border dark:bg-white/[0.04] dark:border-white/10 text-[11px]">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="rounded-2xl border-white/10 bg-black/95">
+                  <SelectContent className="rounded-2xl border-border dark:border-white/10 bg-card dark:bg-black/95">
                     {RITUAL_ICON_KEYS.map((key) => {
                       const Icon = RITUAL_ICON_MAP[key];
                       return (
@@ -152,7 +152,7 @@ export default function SanctuaryConfigPage() {
               <button
                 type="button"
                 onClick={() => { setShowAddForm(false); setNewRitual({ label: '', labelPt: '', icon: 'moon' }); }}
-                className="px-4 py-2.5 rounded-full border border-white/10 text-[9px] font-bold uppercase"
+                className="px-4 py-2.5 rounded-full border border-border dark:border-white/10 text-[9px] font-bold uppercase"
               >
                 Cancel
               </button>
@@ -166,7 +166,7 @@ export default function SanctuaryConfigPage() {
             return (
               <li
                 key={ritual.id}
-                className="flex items-center justify-between gap-4 p-3 rounded-[1.5rem] border border-white/5 bg-white/[0.02]"
+                className="flex items-center justify-between gap-4 p-3 rounded-[1.5rem] border border-border dark:border-white/5 bg-muted/20 dark:bg-white/[0.02]"
               >
                 <div className="flex items-center gap-3">
                   {IconComp && <IconComp size={18} className="opacity-50" />}
@@ -198,7 +198,7 @@ export default function SanctuaryConfigPage() {
           return (
             <div
               key={pillar.id}
-              className="luxury-blur p-6 rounded-[2.5rem] border border-white/5 luxury-shadow bg-black/20 space-y-4"
+              className="luxury-blur p-6 rounded-[2.5rem] border border-border dark:border-white/5 luxury-shadow bg-muted/40 dark:bg-black/20 space-y-4"
             >
               <div className="flex items-center gap-3">
                 <pillar.icon size={20} className="text-primary opacity-40" />
@@ -216,7 +216,7 @@ export default function SanctuaryConfigPage() {
                       key={ritual.id}
                       className={cn(
                         "flex items-center gap-2 cursor-pointer rounded-full px-4 py-2.5 border transition-all",
-                        checked ? "border-primary/40 bg-primary/5" : "border-white/5 opacity-50 hover:opacity-80"
+                        checked ? "border-primary/40 bg-primary/5" : "border-border dark:border-white/5 opacity-50 hover:opacity-80"
                       )}
                     >
                       <Checkbox
@@ -227,7 +227,7 @@ export default function SanctuaryConfigPage() {
                             : [...currentRituals, ritual.id];
                           setPillarRituals(pillar.id, next);
                         }}
-                        className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        className="border-border dark:border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                       />
                       {IconComp && <IconComp size={14} className="opacity-60" />}
                       <span className="text-[9px] font-bold uppercase tracking-wider">{ritual.label}</span>
@@ -240,16 +240,16 @@ export default function SanctuaryConfigPage() {
         })}
       </section>
 
-      <section className="luxury-blur p-6 rounded-[2.5rem] border border-white/5 luxury-shadow bg-black/20 space-y-4">
+      <section className="luxury-blur p-6 rounded-[2.5rem] border border-border dark:border-white/5 luxury-shadow bg-muted/40 dark:bg-black/20 space-y-4">
         <div className="flex items-center gap-3">
           <Watch size={20} className="text-primary opacity-40" />
           <h2 className="text-lg luxury-text">Relógio</h2>
         </div>
         <p className="text-[9px] font-medium uppercase tracking-[0.4em] opacity-50">
-          Para o relógio ficar sempre sincronizado, define em <code className="rounded bg-white/10 px-1 text-[8px]">config-watch.json</code>: <code className="rounded bg-white/10 px-1 text-[8px]">apiBase</code>, <code className="rounded bg-white/10 px-1 text-[8px]">accessToken</code> e <code className="rounded bg-white/10 px-1 text-[8px]">refreshToken</code>. O refresh permite renovação automática do token.
+          Para o relógio ficar sempre sincronizado, define em <code className="rounded bg-muted/50 dark:bg-white/10 px-1 text-[8px]">config-watch.json</code>: <code className="rounded bg-muted/50 dark:bg-white/10 px-1 text-[8px]">apiBase</code>, <code className="rounded bg-muted/50 dark:bg-white/10 px-1 text-[8px]">accessToken</code> e <code className="rounded bg-muted/50 dark:bg-white/10 px-1 text-[8px]">refreshToken</code>. O refresh permite renovação automática do token.
         </p>
         <p className="text-[8px] opacity-40">
-          apiBase: <code className="rounded bg-white/10 px-1">{typeof window !== 'undefined' ? window.location.origin : ''}</code>
+          apiBase: <code className="rounded bg-muted/50 dark:bg-white/10 px-1">{typeof window !== 'undefined' ? window.location.origin : ''}</code>
         </p>
         <button
           type="button"

@@ -160,10 +160,10 @@ export function DailyPlaybook({
             return (
               <div
                 key={pillar.id}
-                className="luxury-blur p-5 rounded-[2rem] border border-white/5 bg-black/25 flex items-center justify-between gap-4"
+                className="luxury-blur p-5 rounded-[2rem] border border-border dark:border-white/5 bg-muted/40 dark:bg-black/25 flex items-center justify-between gap-4"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center bg-muted/60 dark:bg-white/5">
                     <pillar.icon size={18} className="opacity-70" />
                   </div>
                   <div className="space-y-1">
@@ -187,7 +187,7 @@ export function DailyPlaybook({
                     <span className="text-[9px] font-black uppercase tracking-[0.4em] opacity-30">
                       {progress.toFixed(0)}%
                     </span>
-                    <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                    <div className="w-full h-1 bg-muted dark:bg-white/10 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-primary gold-glow transition-all duration-1000"
                         style={{ width: `${progress}%` }}
@@ -241,8 +241,8 @@ export function DailyPlaybook({
                 disabled={disabled}
                 className={cn(
                   "luxury-blur p-4 rounded-[2rem] border flex items-center justify-between text-left transition-all w-full",
-                  !disabled && "border-white/5 bg-black/20 hover:border-primary/20 hover:bg-black/30 cursor-pointer",
-                  disabled && "opacity-50 cursor-not-allowed border-white/5 bg-black/20"
+                  !disabled && "border-border dark:border-white/5 bg-muted/40 dark:bg-black/20 hover:border-primary/20 hover:bg-muted/60 dark:hover:bg-black/30 cursor-pointer",
+                  disabled && "opacity-50 cursor-not-allowed border-border dark:border-white/5 bg-muted/40 dark:bg-black/20"
                 )}
               >
                 <div className="flex items-center gap-3">
@@ -332,8 +332,8 @@ export function DailyPlaybook({
                 key={id}
                 onClick={() => toggleVital(id)}
                 className={cn(
-                  "luxury-blur p-4 rounded-[2rem] border flex items-center justify-between text-left transition-all w-full hover:border-white/15",
-                  done ? "border-primary/30 bg-primary/5" : "border-white/5 bg-black/20"
+                  "luxury-blur p-4 rounded-[2rem] border flex items-center justify-between text-left transition-all w-full hover:border-primary/20 dark:hover:border-white/15",
+                  done ? "border-primary/30 bg-primary/5" : "border-border dark:border-white/5 bg-muted/40 dark:bg-black/20"
                 )}
               >
                 <div className="space-y-1">
