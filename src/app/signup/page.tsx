@@ -28,8 +28,8 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-sm luxury-blur luxury-shadow rounded-[2.5rem] border border-border dark:border-white/10 p-8 sm:p-10 bg-card/95 dark:bg-white/[0.04]">
+    <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-background px-4 py-8 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
+      <div className="w-full max-w-sm luxury-blur luxury-shadow rounded-3xl border border-border dark:border-white/10 p-8 bg-card/95 dark:bg-white/[0.04]">
         <div className="text-center mb-8">
           <p className="text-[9px] font-black uppercase tracking-[1em] opacity-40 gold-glow">Sovereign</p>
           <h1 className="mt-4 text-2xl font-light tracking-[0.4em] uppercase text-foreground luxury-text">Create account</h1>
@@ -71,7 +71,7 @@ export default function SignupPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-14 rounded-full bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.8em] luxury-shadow hover:opacity-90 disabled:opacity-50 transition-all gold-glow"
+            className="min-touch w-full h-14 rounded-full bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.8em] luxury-shadow hover:opacity-90 active:scale-[0.98] disabled:opacity-50 transition-all"
           >
             {loading ? 'Creating account...' : 'Sign up'}
           </button>

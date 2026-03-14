@@ -18,7 +18,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { PILLAR_CONFIG } from '@/lib/constants';
 
 export default function SanctuaryVaultPage() {
-  const { assets, addAsset, addAssetWithLinkedCapital, deleteAsset, updateAsset, isHydrated, assetAnalytics, updateAssetCriticalRituals, getDefaultCriticalRitualsForPillar, ritualDefinitions, updateAssetTasks, addGoalEntry, deleteGoalEntry, getGoalEntriesForAsset, getNextStepInPath, getChildrenOf, getNextStepOrderForParent, isAssetComplete, currentTime } = useFoco();
+  const { assets, addAsset, addAssetWithLinkedCapital, deleteAsset, updateAsset, isHydrated, assetAnalytics, ritualDefinitions, updateAssetTasks, addGoalEntry, deleteGoalEntry, getGoalEntriesForAsset, getNextStepInPath, getChildrenOf, getNextStepOrderForParent, isAssetComplete, currentTime } = useFoco();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [newAsset, setNewAsset] = useState<{
@@ -254,7 +254,7 @@ export default function SanctuaryVaultPage() {
 
   if (!isHydrated) {
     return (
-      <div className="max-w-screen-sm mx-auto px-4 sm:px-6 md:px-8 h-[60vh] flex items-center justify-center">
+      <div className="page-content h-[60vh] flex items-center justify-center">
         <p className="text-[9px] font-black uppercase tracking-[1em] text-muted-foreground animate-pulse">
           Initializing Vault...
         </p>
@@ -263,7 +263,7 @@ export default function SanctuaryVaultPage() {
   }
 
   return (
-    <div className="max-w-screen-sm mx-auto px-4 sm:px-6 md:px-8 space-y-12 animate-in fade-in duration-1000">
+    <div className="page-content space-y-10 animate-in fade-in duration-500">
       <header className="space-y-4">
         <div className="flex items-center justify-between">
           <Link
@@ -741,47 +741,6 @@ export default function SanctuaryVaultPage() {
                         </div>
                       )}
 
-                      {!isMoney && (
-                        <Collapsible defaultOpen={false} className="group">
-                          <CollapsibleTrigger className="mt-4 pt-4 border-t border-border dark:border-white/5 w-full flex items-center justify-between text-left hover:opacity-90 transition-opacity">
-                            <span className="text-[8px] font-black uppercase tracking-[0.4em] opacity-50">
-                              Critical rituals ({(asset.criticalRituals ?? getDefaultCriticalRitualsForPillar(asset.category)).length})
-                            </span>
-                            <ChevronDown size={12} className="opacity-50 transition-transform group-data-[state=open]:rotate-180" />
-                          </CollapsibleTrigger>
-                          <CollapsibleContent>
-                            <div className="flex flex-wrap gap-2 pt-3">
-                              {ritualDefinitions.map((ritual) => {
-                                const IconComp = RITUAL_ICON_MAP[ritual.icon];
-                                const effectiveRituals = asset.criticalRituals ?? getDefaultCriticalRitualsForPillar(asset.category);
-                                const checked = effectiveRituals.includes(ritual.id);
-                                return (
-                                  <label
-                                    key={ritual.id}
-                                    className={cn(
-                                      "flex items-center gap-1.5 cursor-pointer rounded-full px-3 py-1.5 border transition-all",
-                                      checked ? "border-primary/40 bg-primary/5" : "border-border dark:border-white/10 opacity-70 hover:opacity-100"
-                                    )}
-                                  >
-                                    <Checkbox
-                                      checked={checked}
-                                      onCheckedChange={() => {
-                                        const next = checked
-                                          ? effectiveRituals.filter((r) => r !== ritual.id)
-                                          : [...effectiveRituals, ritual.id];
-                                        updateAssetCriticalRituals(asset.id, next);
-                                      }}
-                                      className="border-border dark:border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary h-3.5 w-3.5"
-                                    />
-                                    {IconComp && <IconComp size={10} className="opacity-70 shrink-0" />}
-                                    <span className="text-[8px] font-bold uppercase tracking-wider">{ritual.label}</span>
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      )}
                     </div>
                   );
                 })}

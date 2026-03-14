@@ -1,6 +1,92 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
+type AssetLike = {
+  id: string;
+  targetHours: number;
+  investedHours: number;
+  horizonYears: number;
+  createdAt?: string;
+  category: string;
+  targetType?: string;
+  targetAmount?: number;
+  investedAmount?: number;
+  parentAssetId?: string;
+  priority: string;
+};
+type LogLike = { assetId?: string; duration: number; timestamp: string; mode: string };
+
+const PRIORITY_ORDER = ['high', 'medium', 'low'];
+const PILLAR_ORDER = ['professional', 'personal', 'vitality', 'capital'] as const;
+
+function computeDailyTargetHoursForDate(
+  dateStr: string,
+  assets: AssetLike[],
+  sessionLogs: LogLike[]
+): number {
+  const endOfDate = new Date(dateStr);
+  endOfDate.setHours(23, 59, 59, 999);
+  const endTime = endOfDate.getTime();
+
+  const getInvestedAsOf = (assetId: string) =>
+    sessionLogs
+      .filter(
+        (l) =>
+          l.mode === 'focus' &&
+          l.assetId === assetId &&
+          new Date(l.timestamp).getTime() <= endTime
+      )
+      .reduce((acc, l) => acc + l.duration / 60, 0);
+
+  const analyticsFor = (asset: AssetLike) => {
+    if ((asset.targetType ?? 'hours') === 'money') return { dailyRequired: 0 };
+    const totalDays = asset.horizonYears * 365;
+    const createdAt = new Date(asset.createdAt ?? 0).getTime();
+    const daysPassed = Math.max(0, Math.floor((endTime - createdAt) / (24 * 60 * 60 * 1000)));
+    const daysRemaining = Math.max(1, totalDays - daysPassed);
+    const investedAsOf = getInvestedAsOf(asset.id);
+    const remaining = Math.max(0, asset.targetHours - investedAsOf);
+    return { dailyRequired: remaining / daysRemaining };
+  };
+
+  const isCompleteAsOf = (asset: AssetLike) => {
+    if ((asset.targetType ?? 'hours') === 'money')
+      return (asset.investedAmount ?? 0) >= (asset.targetAmount ?? 0);
+    return getInvestedAsOf(asset.id) >= asset.targetHours;
+  };
+
+  const getPriorityAssetForPillar = (category: string): AssetLike | null => {
+    const hoursAssets = assets.filter(
+      (a) =>
+        a.category === category &&
+        (a.targetType ?? 'hours') === 'hours' &&
+        !isCompleteAsOf(a)
+    );
+    if (hoursAssets.length === 0) return null;
+    const eligible = hoursAssets.filter((a) => {
+      if (!a.parentAssetId) return true;
+      const parent = assets.find((p) => p.id === a.parentAssetId);
+      return parent ? isCompleteAsOf(parent) : true;
+    });
+    eligible.sort((a, b) => {
+      const pA = PRIORITY_ORDER.indexOf(a.priority);
+      const pB = PRIORITY_ORDER.indexOf(b.priority);
+      if (pA !== pB) return pA - pB;
+      const anaA = analyticsFor(a);
+      const anaB = analyticsFor(b);
+      return anaB.dailyRequired - anaA.dailyRequired;
+    });
+    return eligible[0] ?? null;
+  };
+
+  let total = 0;
+  for (const pillar of PILLAR_ORDER) {
+    const a = getPriorityAssetForPillar(pillar);
+    if (a) total += analyticsFor(a).dailyRequired;
+  }
+  return total;
+}
+
 export async function GET(request: Request) {
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -92,6 +178,70 @@ export async function GET(request: Request) {
     date: row.date,
     value: Number(row.value),
   }));
+
+  if (
+    latestAppStateDate &&
+    new Date(latestAppStateDate).getTime() < new Date(lastDate).getTime()
+  ) {
+    const snapRes = await supabase
+      .from('daily_snapshots')
+      .select('date')
+      .eq('user_id', user.id)
+      .eq('date', latestAppStateDate)
+      .maybeSingle();
+    const hasSnapshot = snapRes.data != null;
+    if (!hasSnapshot) {
+      const prevStateRes = await supabase
+        .from('app_state')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('last_date', latestAppStateDate)
+        .maybeSingle();
+      const prevRow = prevStateRes.data;
+      const focusHours = (sessionLogs ?? [])
+        .filter(
+          (log) =>
+            log.mode === 'focus' &&
+            new Date(log.timestamp).toDateString() === latestAppStateDate
+        )
+        .reduce((acc, log) => acc + log.duration / 60, 0);
+      const ritualDefs = Array.isArray(prevRow?.ritual_definitions) && (prevRow?.ritual_definitions as unknown[]).length > 0
+        ? (prevRow.ritual_definitions as Array<{ id: string; type?: string }>)
+        : [];
+      const prevVitals = (prevRow?.vitals as Record<string, boolean>) ?? (prevRow?.playbook_rituals_completed as Record<string, boolean>) ?? {};
+      const numeric = (prevRow?.ritual_numeric_values as Record<string, number>) ?? {};
+      const active = ritualDefs.filter((r) =>
+        r.type === 'number' ? numeric[r.id] != null : prevVitals[r.id]
+      ).length;
+      const integrity = ritualDefs.length === 0 ? 0 : Math.round((active / ritualDefs.length) * 10);
+      const assetLike: AssetLike[] = assets.map((a) => ({
+        id: a.id,
+        targetHours: a.targetHours,
+        investedHours: a.investedHours,
+        horizonYears: a.horizonYears,
+        createdAt: a.createdAt,
+        category: a.category,
+        targetType: a.targetType,
+        targetAmount: a.targetAmount,
+        investedAmount: a.investedAmount,
+        parentAssetId: a.parentAssetId,
+        priority: a.priority,
+      }));
+      const targetHours = computeDailyTargetHoursForDate(latestAppStateDate, assetLike, sessionLogs);
+      const objectivesMet = focusHours >= targetHours;
+      await supabase.from('daily_snapshots').upsert(
+        {
+          user_id: user.id,
+          date: latestAppStateDate,
+          focus_hours: Math.max(0, focusHours),
+          integrity: Math.min(10, Math.max(0, integrity)),
+          target_hours: Math.max(0, targetHours),
+          objectives_met: Boolean(objectivesMet),
+        },
+        { onConflict: 'user_id,date' }
+      );
+    }
+  }
 
   return NextResponse.json({
     assets,
@@ -241,8 +391,8 @@ export async function POST(request: Request) {
       {
         user_id: user.id,
         last_date: lastDate,
-        vitals: body.vitals ?? {},
-        playbook_rituals_completed: body.playbookRitualsCompleted ?? {},
+        vitals: body.vitals ?? body.playbookRitualsCompleted ?? {},
+        playbook_rituals_completed: body.vitals ?? body.playbookRitualsCompleted ?? {},
         life_tracker: body.lifeTracker ?? {},
         ritual_definitions: body.ritualDefinitions ?? null,
         pillar_rituals_config: body.pillarRitualsConfig ?? {},

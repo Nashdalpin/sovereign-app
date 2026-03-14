@@ -103,8 +103,6 @@ interface AssetStoreContextType {
     todayFocusSecs: number;
   };
   vitals: Vitals;
-  /** Playbook-only checklist (Sustain your mandates). Does not affect Sanctuary/Altar or Integrity. */
-  playbookRitualsCompleted: Record<string, boolean>;
   ritualNumericValues: RitualNumericValues;
   /** Time series of numeric ritual values (from API). Keyed by ritual for charts/trends. */
   ritualNumericHistory: RitualNumericHistory;
@@ -124,8 +122,6 @@ interface AssetStoreContextType {
   updateAssetTasks: (assetId: string, tasks: { title: string, priority: Priority }[]) => void;
   toggleTask: (assetId: string, taskId: string) => void;
   toggleVital: (key: string) => void;
-  /** Toggle ritual as complete in Playbook only (does not affect Sanctuary vitals or Integrity). */
-  togglePlaybookRitual: (key: string) => void;
   dailyStats: { focus: number };
   intensityRequired: number;
   /** True when pressure >= 100%: cannot finish all mandates today; UI locks to most urgent. */
@@ -163,11 +159,8 @@ interface AssetStoreContextType {
   /** First not-yet-completed focus block for today. */
   getNextFocusBlock: () => { index: number; suggestedAssetId: string | null; suggestedAssetName: string | null; minutes: number; totalBlocks: number; blocked: boolean } | null;
   currentTime: number;
-  getMissingCriticalRituals: (asset: Asset | null) => string[];
   getPillarRituals: (pillar: Pillar) => string[];
   setPillarRituals: (pillar: Pillar, rituals: string[]) => void;
-  updateAssetCriticalRituals: (assetId: string, rituals: string[]) => void;
-  getDefaultCriticalRitualsForPillar: (pillar: Pillar) => string[];
   updateAsset: (assetId: string, updates: Partial<Pick<Asset, 'name' | 'category' | 'targetHours' | 'horizonYears' | 'priority' | 'targetAmount' | 'currency' | 'parentAssetId' | 'stepOrder' | 'linkedCapitalAssetId' | 'targetWeight' | 'currentWeight' | 'targetUnit'>>) => void;
 }
 
@@ -185,7 +178,6 @@ function getDefaultFocoContext(): AssetStoreContextType {
     getGoalEntriesForAsset: () => [],
     lifeTracker: { activeMode: 'passive', activeAssetId: null, stateStartTime: now, todayFocusSecs: 0 },
     vitals: {},
-    playbookRitualsCompleted: {},
     ritualNumericValues: {},
     ritualNumericHistory: [],
     setRitualNumericValue: noop,
@@ -203,7 +195,6 @@ function getDefaultFocoContext(): AssetStoreContextType {
     updateAssetTasks: noop,
     toggleTask: noop,
     toggleVital: noop,
-    togglePlaybookRitual: noop,
     dailyStats: { focus: 0 },
     intensityRequired: 0,
     isCritical: false,
@@ -227,11 +218,8 @@ function getDefaultFocoContext(): AssetStoreContextType {
     getFocusBlocks: () => [],
     getNextFocusBlock: () => null,
     currentTime: now,
-    getMissingCriticalRituals: () => [],
     getPillarRituals: () => [],
     setPillarRituals: noop,
-    updateAssetCriticalRituals: noop,
-    getDefaultCriticalRitualsForPillar: () => [],
     updateAsset: noop,
   };
 }
@@ -323,7 +311,6 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
   const [vitals, setVitals] = useState<Vitals>(() =>
     DEFAULT_RITUAL_DEFINITIONS.reduce<Vitals>((acc, r) => ({ ...acc, [r.id]: false }), {})
   );
-  const [playbookRitualsCompleted, setPlaybookRitualsCompleted] = useState<Record<string, boolean>>({});
   const [lifeTracker, setLifeTracker] = useState({
     activeMode: 'passive' as LifeMode,
     activeAssetId: null as string | null,
@@ -342,6 +329,20 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
   const initialLoadFromApiDone = useRef(false);
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSyncPayloadRef = useRef<{
+    assets: Asset[];
+    sessionLogs: SessionLog[];
+    goalEntries: GoalEntry[];
+    lifeTracker: { activeMode: LifeMode; activeAssetId: string | null; stateStartTime: number; todayFocusSecs: number };
+    vitals: Vitals;
+    ritualNumericValues: RitualNumericValues;
+    ritualDefinitions: RitualDefinition[];
+    lastDate: string;
+    completedBlockIndices: number[];
+    currentBlockIndex: number | null;
+    currentBlockSuggestedMinutes: number | null;
+    pillarRitualsConfig: Record<Pillar, string[]>;
+  } | null>(null);
 
   useEffect(() => {
     const now = Date.now();
@@ -397,8 +398,9 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
               setPillarRitualsConfig({ ...DEFAULT_CRITICAL_RITUALS_BY_PILLAR, ...data.appState.pillarRitualsConfig });
             }
             const defaultVitals: Vitals = (defs as RitualDefinition[]).reduce<Vitals>((acc: Vitals, r: RitualDefinition) => ({ ...acc, [r.id]: false }), {});
-            setVitals({ ...defaultVitals, ...(data.appState?.vitals ?? {}) });
-            setPlaybookRitualsCompleted((data.appState?.playbookRitualsCompleted as Record<string, boolean>) ?? {});
+            const fromApi = (data.appState?.vitals as Vitals) ?? {};
+            const fromLegacy = (data.appState?.playbookRitualsCompleted as Record<string, boolean>) ?? {};
+            setVitals(Object.keys(fromApi).length ? { ...defaultVitals, ...fromApi } : { ...defaultVitals, ...fromLegacy });
             const lt = data.appState?.lifeTracker;
             if (lt?.activeMode === 'focus') {
               setLifeTracker({ ...lt, activeMode: 'passive', stateStartTime: now });
@@ -417,7 +419,7 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
                 if (prevRes.ok) {
                   const prevData = await prevRes.json();
                   const prevState = prevData.appState ?? {};
-                  const playbook = (prevState.playbookRitualsCompleted as Record<string, boolean>) ?? {};
+                  const prevVitals = (prevState.vitals as Record<string, boolean>) ?? (prevState.playbookRitualsCompleted as Record<string, boolean>) ?? {};
                   const numeric = (prevState.ritualNumericValues as Record<string, number>) ?? {};
                   const focusHours = (data.sessionLogs ?? [])
                     .filter((log: SessionLog) => log.mode === 'focus' && new Date(log.timestamp).toDateString() === data.latestAppStateDate)
@@ -426,7 +428,7 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
                     ? prevData.appState.ritualDefinitions
                     : (defs as RitualDefinition[]);
                   const active = ritualDefs.filter((r: RitualDefinition) =>
-                    (r as RitualDefinition).type === 'number' ? numeric[r.id] != null : playbook[r.id]
+                    (r as RitualDefinition).type === 'number' ? numeric[r.id] != null : prevVitals[r.id]
                   ).length;
                   const integrity = ritualDefs.length === 0 ? 0 : Math.round((active / ritualDefs.length) * 10);
                   const targetHours = computeDailyTargetHoursForDate(data.latestAppStateDate, mappedAssets, data.sessionLogs ?? []);
@@ -490,7 +492,9 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
               setPillarRitualsConfig({ ...DEFAULT_CRITICAL_RITUALS_BY_PILLAR, ...data.pillarRitualsConfig });
             }
             const defaultVitals: Vitals = (defs as RitualDefinition[]).reduce<Vitals>((acc: Vitals, r: RitualDefinition) => ({ ...acc, [r.id]: false }), {});
-            setVitals({ ...defaultVitals, ...(data.lastDate === todayStr ? (data.vitals || {}) : {}) });
+            const localVitals = (data.vitals as Vitals) ?? {};
+            const localLegacy = (data.playbookRitualsCompleted as Record<string, boolean>) ?? {};
+            setVitals(data.lastDate === todayStr ? (Object.keys(localVitals).length ? { ...defaultVitals, ...localVitals } : { ...defaultVitals, ...localLegacy }) : defaultVitals);
             if (data.lastDate === todayStr) {
               const restored = data.lifeTracker;
               if (restored?.activeMode === 'focus') {
@@ -498,7 +502,6 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
               } else {
                 setLifeTracker(restored || { activeMode: 'passive', activeAssetId: null, stateStartTime: now, todayFocusSecs: 0 });
               }
-              setPlaybookRitualsCompleted((data.playbookRitualsCompleted as Record<string, boolean>) || {});
               setCompletedBlockIndices(data.completedBlockIndices || []);
               setCurrentBlockIndexState(data.currentBlockIndex ?? null);
               setCurrentBlockSuggestedMinutes(data.currentBlockSuggestedMinutes ?? null);
@@ -523,24 +526,25 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isHydrated || !userId || !initialLoadFromApiDone.current) return;
+    const payload = {
+      assets,
+      sessionLogs,
+      goalEntries,
+      lifeTracker,
+      vitals,
+      playbookRitualsCompleted: vitals,
+      ritualNumericValues,
+      ritualDefinitions,
+      lastDate: new Date().toDateString(),
+      completedBlockIndices,
+      currentBlockIndex,
+      currentBlockSuggestedMinutes,
+      pillarRitualsConfig,
+    };
+    lastSyncPayloadRef.current = payload;
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     syncTimeoutRef.current = setTimeout(() => {
       syncTimeoutRef.current = null;
-      const payload = {
-        assets,
-        sessionLogs,
-        goalEntries,
-        lifeTracker,
-        vitals,
-        playbookRitualsCompleted,
-        ritualNumericValues,
-        ritualDefinitions,
-        lastDate: new Date().toDateString(),
-        completedBlockIndices,
-        currentBlockIndex,
-        currentBlockSuggestedMinutes,
-        pillarRitualsConfig,
-      };
       fetch('/api/me/data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -553,7 +557,30 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
       });
     }, 1500);
     return () => { if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current); };
-  }, [isHydrated, userId, assets, sessionLogs, goalEntries, lifeTracker, vitals, playbookRitualsCompleted, ritualNumericValues, ritualDefinitions, completedBlockIndices, currentBlockIndex, currentBlockSuggestedMinutes, pillarRitualsConfig]);
+  }, [isHydrated, userId, assets, sessionLogs, goalEntries, lifeTracker, vitals, ritualNumericValues, ritualDefinitions, completedBlockIndices, currentBlockIndex, currentBlockSuggestedMinutes, pillarRitualsConfig]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const flush = () => {
+      if (!lastSyncPayloadRef.current) return;
+      fetch('/api/me/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(lastSyncPayloadRef.current),
+        keepalive: true,
+      }).catch(() => {});
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    const onBeforeUnload = () => { flush(); };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isHydrated || userId) return;
@@ -563,7 +590,6 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
       goalEntries,
       lifeTracker,
       vitals,
-      playbookRitualsCompleted,
       ritualNumericValues,
       ritualDefinitions,
       lastDate: new Date().toDateString(),
@@ -573,7 +599,7 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
       pillarRitualsConfig
     };
     localStorage.setItem('sovereign_v5', JSON.stringify(data));
-  }, [assets, sessionLogs, goalEntries, lifeTracker, vitals, playbookRitualsCompleted, ritualNumericValues, ritualDefinitions, isHydrated, userId, completedBlockIndices, currentBlockIndex, currentBlockSuggestedMinutes, pillarRitualsConfig]);
+  }, [assets, sessionLogs, goalEntries, lifeTracker, vitals, ritualNumericValues, ritualDefinitions, isHydrated, userId, completedBlockIndices, currentBlockIndex, currentBlockSuggestedMinutes, pillarRitualsConfig]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
@@ -591,13 +617,13 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
   }, [lifeTracker, currentTime, isHydrated]);
 
   const currentVitality = useMemo(() => {
-    if (ritualDefinitions.length === 0) return 0;
+    if (!isHydrated || ritualDefinitions.length === 0) return 0;
     const active = ritualDefinitions.filter((r) => {
       if ((r as RitualDefinition).type === 'number') return ritualNumericValues[r.id] != null;
-      return playbookRitualsCompleted[r.id];
+      return vitals[r.id];
     }).length;
     return Math.round((active / ritualDefinitions.length) * 10);
-  }, [playbookRitualsCompleted, ritualNumericValues, ritualDefinitions]);
+  }, [vitals, ritualNumericValues, ritualDefinitions, isHydrated]);
 
   const assetAnalytics = useCallback((assetId: string) => {
     const asset = assets.find(a => a.id === assetId);
@@ -940,24 +966,10 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
     setAssets(prev => [...prev, capitalAsset, mainAsset]);
   };
 
-  const getMissingCriticalRituals = (asset: Asset | null): string[] => {
-    if (!asset) return [];
-    const rituals = asset.criticalRituals ?? DEFAULT_CRITICAL_RITUALS_BY_PILLAR[asset.category];
-    return rituals.filter((id) => {
-      const def = ritualDefinitions.find(r => r.id === id);
-      if (def?.type === 'number') return ritualNumericValues[id] == null;
-      return !playbookRitualsCompleted[id];
-    });
-  };
-
   const getPillarRituals = (pillar: Pillar): string[] => pillarRitualsConfig[pillar] ?? DEFAULT_CRITICAL_RITUALS_BY_PILLAR[pillar];
   const setPillarRituals = (pillar: Pillar, rituals: string[]) => {
     setPillarRitualsConfig(prev => ({ ...prev, [pillar]: rituals }));
   };
-  const updateAssetCriticalRituals = (assetId: string, rituals: string[]) => {
-    setAssets(prev => prev.map(a => a.id === assetId ? { ...a, criticalRituals: rituals } : a));
-  };
-  const getDefaultCriticalRitualsForPillar = (pillar: Pillar): string[] => DEFAULT_CRITICAL_RITUALS_BY_PILLAR[pillar];
 
   const updateAsset = (assetId: string, updates: Partial<Pick<Asset, 'name' | 'category' | 'targetHours' | 'horizonYears' | 'priority' | 'targetAmount' | 'currency' | 'parentAssetId' | 'stepOrder' | 'linkedCapitalAssetId' | 'targetWeight' | 'currentWeight' | 'targetUnit'>>) => {
     setAssets(prev => prev.map(a => a.id === assetId ? { ...a, ...updates } : a));
@@ -1044,17 +1056,12 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
     setVitals(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const togglePlaybookRitual = (key: string) => {
-    setPlaybookRitualsCompleted(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
   const totalInvestment = useMemo(() => assets.reduce((acc, a) => acc + (a.investedHours || 0), 0), [assets]);
 
   return (
     <AssetStoreContext.Provider value={{
       assets, goalEntries, addGoalEntry, deleteGoalEntry, getGoalEntriesForAsset,
       lifeTracker, sessionLogs, totalInvestment, dailyTargetHours, isHydrated, vitals,
-      playbookRitualsCompleted, togglePlaybookRitual,
       ritualNumericValues, ritualNumericHistory, setRitualNumericValue,
       ritualDefinitions, addRitual, deleteRitual,
       addAsset, addAssetWithLinkedCapital, deleteAsset, toggleFocus, updateAssetTasks, toggleTask, toggleVital, dailyStats,
@@ -1064,11 +1071,8 @@ export function FocoProvider({ children }: { children: React.ReactNode }) {
       getFocusBlocks,
       getNextFocusBlock,
       currentTime,
-      getMissingCriticalRituals,
       getPillarRituals,
       setPillarRituals,
-      updateAssetCriticalRituals,
-      getDefaultCriticalRitualsForPillar,
       updateAsset
     }}>
       {children}

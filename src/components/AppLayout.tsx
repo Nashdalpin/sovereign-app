@@ -84,7 +84,7 @@ export function AppLayoutContent({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-body selection:bg-primary/30">
+    <div className="min-h-screen min-h-[100dvh] bg-background text-foreground font-body selection:bg-primary/30">
       <header className="min-h-16 h-16 flex items-center justify-between px-6 fixed top-0 w-full z-40 bg-background/80 dark:bg-background/70 backdrop-blur-xl border-b border-border dark:border-white/15 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center gap-4">
           <span className="text-[8px] font-black uppercase tracking-[0.8em] text-foreground/80 dark:text-foreground gold-glow">Sovereign</span>
@@ -100,15 +100,15 @@ export function AppLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main className="relative z-10 pt-20 pb-[calc(8rem+env(safe-area-inset-bottom,0px))]">{children}</main>
-      
+
       <nav className="fixed left-1/2 -translate-x-1/2 z-50 w-[94%] max-w-[340px] bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
         <div className="luxury-blur rounded-full luxury-shadow flex justify-around items-center h-16 px-2 border border-border dark:border-white/15 backdrop-blur-3xl bg-card/90 dark:bg-white/[0.08]">
           {NavItems.map((item) => {
             const isActive = item.href === '/' ? pathname === '/' : pathname === item.href || (item.href === '/sanctuary' && pathname.startsWith('/sanctuary')) || (item.href === '/playbook' && pathname.startsWith('/playbook'));
             return (
-              <Link 
-                key={item.href} 
-                href={item.href} 
+              <Link
+                key={item.href}
+                href={item.href}
                 aria-label={`Go to ${item.label}`}
                 className={cn(
                   "flex flex-col items-center justify-center flex-1 h-12 rounded-full transition-all duration-500 min-w-0",

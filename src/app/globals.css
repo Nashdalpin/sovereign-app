@@ -59,11 +59,13 @@
     -ms-overflow-style: none;
     min-height: 100dvh;
     min-height: -webkit-fill-available;
+    -webkit-text-size-adjust: 100%;
   }
   body {
     @apply bg-background text-foreground font-body antialiased selection:bg-primary/20 overflow-x-hidden;
-    transition: background-color 0.8s ease, color 0.5s ease;
+    transition: background-color 0.4s ease, color 0.3s ease;
     -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
     scrollbar-width: none;
     -ms-overflow-style: none;
     min-height: 100dvh;
@@ -75,8 +77,15 @@
   }
 }
 
+/* Apple-style safe area & layout */
+.safe-top { padding-top: env(safe-area-inset-top); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+.safe-inset-x { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+.min-touch { min-height: 44px; min-width: 44px; }
+.page-content { @apply max-w-screen-sm mx-auto w-full px-4 sm:px-5; }
+
 .luxury-blur {
-  @apply backdrop-blur-[40px] bg-card/90 border border-border dark:bg-white/[0.06] dark:border-white/15;
+  @apply backdrop-blur-xl bg-card/90 border border-border dark:bg-white/[0.06] dark:border-white/15;
 }
 
 .luxury-text {
@@ -88,11 +97,11 @@
 }
 
 .luxury-shadow {
-  box-shadow: 0 20px 50px -15px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.12), 0 8px 32px -8px rgba(0, 0, 0, 0.08);
 }
 
 .dark .luxury-shadow {
-  box-shadow: 0 40px 80px -25px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.4), 0 8px 32px -8px rgba(0, 0, 0, 0.25);
 }
 
 .luxury-card {

@@ -40,15 +40,13 @@ export function DailyPlaybook({
     getNextFocusBlock,
     assetAnalytics,
     vitals,
-    playbookRitualsCompleted,
-    togglePlaybookRitual,
+    toggleVital,
     ritualDefinitions,
     intensityRequired,
     isCritical,
     getCriticalAsset,
     completedBlockIndices,
     setCurrentBlockIndex,
-    getMissingCriticalRituals,
   } = useFoco();
 
   const criticalAsset = useMemo(() => getCriticalAsset(), [getCriticalAsset]);
@@ -73,27 +71,20 @@ export function DailyPlaybook({
   }, [getFocusBlocks, assets, assetAnalytics]);
 
   const ritualsList = useMemo(() => {
-    const missingForSuggested = getMissingCriticalRituals(suggestedFocusAsset ?? null);
-    const entries = ritualDefinitions.map((r) => [r.id, !!playbookRitualsCompleted[r.id]] as const);
-    const priority = (id: string, done: boolean) =>
-      missingForSuggested.includes(id) ? 0 : done ? 2 : 1;
-    const sorted = [...entries].sort(([idA, doneA], [idB, doneB]) =>
-      priority(idA, doneA) - priority(idB, doneB)
-    );
+    const entries = ritualDefinitions
+      .filter((r) => (r as { type?: string }).type !== 'number')
+      .map((r) => [r.id, !!vitals[r.id]] as const);
+    const sorted = [...entries].sort(([, doneA], [, doneB]) => (doneA ? 2 : 1) - (doneB ? 2 : 1));
     return sorted.slice(0, 7);
-  }, [playbookRitualsCompleted, ritualDefinitions, suggestedFocusAsset, getMissingCriticalRituals]);
+  }, [vitals, ritualDefinitions]);
 
   const ritualById = useMemo(() => Object.fromEntries(ritualDefinitions.map((r) => [r.id, r])), [ritualDefinitions]);
 
   const missingRitualIds = useMemo(() => {
-    const set = new Set<string>();
-    PILLAR_CONFIG.forEach((pillar) => {
-      const alpha = getPriorityAsset(pillar.id);
-      if (!alpha) return;
-      getMissingCriticalRituals(alpha).forEach((id) => set.add(id));
-    });
-    return Array.from(set);
-  }, [getPriorityAsset, getMissingCriticalRituals]);
+    return ritualDefinitions
+      .filter((r) => (r as { type?: string }).type !== 'number' && !vitals[r.id])
+      .map((r) => r.id);
+  }, [ritualDefinitions, vitals]);
 
   const integrityMessage = useMemo(() => {
     if (missingRitualIds.length === 0) return null;
@@ -327,7 +318,7 @@ export function DailyPlaybook({
               <button
                 type="button"
                 key={id}
-                onClick={() => togglePlaybookRitual(id)}
+                onClick={() => toggleVital(id)}
                 aria-label={done ? `Mark ${label} as incomplete` : `Mark ${label} as complete`}
                 aria-pressed={done}
                 className={cn(

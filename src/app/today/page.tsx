@@ -88,7 +88,7 @@ export default function PresenceAltar() {
 
   if (!isHydrated) {
     return (
-      <div className="max-w-screen-sm mx-auto px-4 sm:px-6 md:px-8 h-[60vh] flex items-center justify-center">
+      <div className="page-content h-[60vh] flex items-center justify-center">
         <p className="text-[9px] font-black uppercase tracking-[1em] opacity-20 animate-pulse">
           Initializing Presence Ritual...
         </p>
@@ -98,7 +98,7 @@ export default function PresenceAltar() {
 
   if (assets.length === 0 || hoursOnlyAssets.length === 0) {
     return (
-      <div className="max-w-screen-sm mx-auto h-[70vh] flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 text-center space-y-12 sm:space-y-16 animate-in fade-in duration-1000">
+      <div className="page-content h-[70vh] flex flex-col items-center justify-center text-center space-y-10 sm:space-y-14 animate-in fade-in duration-500">
         <header className="space-y-6">
           <p className="text-[10px] font-black uppercase tracking-[1.2em] opacity-20">Portfolio Void</p>
           <h1 className="text-5xl sm:text-6xl luxury-text">Empty.</h1>
@@ -106,8 +106,8 @@ export default function PresenceAltar() {
         {hoursOnlyAssets.length === 0 && assets.length > 0 && (
           <p className="text-[9px] opacity-50 max-w-xs">Add a focus (hours) mandate in the Vault to start Presence.</p>
         )}
-        <Link href="/sanctuary/vault" className="w-full">
-          <button className="w-full h-24 rounded-full bg-foreground text-background text-[11px] font-black uppercase tracking-[1em] transition-all luxury-shadow border border-white/5">
+        <Link href="/sanctuary/vault" className="w-full block">
+          <button type="button" className="min-touch w-full h-16 sm:h-20 rounded-full bg-foreground text-background text-[11px] font-black uppercase tracking-[0.8em] transition-all luxury-shadow border border-white/5 active:scale-[0.98]">
             Forge Portfolio
           </button>
         </Link>
@@ -116,11 +116,11 @@ export default function PresenceAltar() {
   }
 
   return (
-    <div className="max-w-screen-sm mx-auto px-4 sm:px-6 md:px-8 space-y-10 sm:space-y-16 animate-in fade-in duration-1000">
-      <header className="text-center space-y-8 sm:space-y-10">
-        <div className="space-y-4">
-          <p className="text-[10px] font-black uppercase tracking-[1.5em] opacity-20 gold-glow">Presence Ritual</p>
-          <h1 className="text-5xl sm:text-6xl md:text-7xl luxury-text">Ignite.</h1>
+    <div className="page-content space-y-8 sm:space-y-12 animate-in fade-in duration-500">
+      <header className="text-center space-y-6 sm:space-y-8">
+        <div className="space-y-3">
+          <p className="text-[10px] font-black uppercase tracking-[1.2em] opacity-50">Presence Ritual</p>
+          <h1 className="text-4xl sm:text-5xl md:text-6xl luxury-text">Ignite.</h1>
           {blockSession && (
             <p className="text-[9px] font-black uppercase tracking-[0.6em] opacity-50">
               Block {blockSession.blockIndex + 1} of {blockSession.totalBlocks} · {blockSession.suggestedMinutes} min
@@ -157,13 +157,13 @@ export default function PresenceAltar() {
           {!isFocusing && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={cn(
-                  "inline-flex items-center gap-6 px-12 py-6 rounded-full border border-white/10 luxury-blur text-[10px] font-bold uppercase tracking-[0.8em] transition-all",
-                  isCritical ? "border-destructive/40 text-destructive bg-destructive/5" : "opacity-40 hover:opacity-100"
+                <button type="button" className={cn(
+                  "min-touch inline-flex items-center gap-4 px-6 py-4 rounded-full border border-white/10 luxury-blur text-[10px] font-bold uppercase tracking-[0.6em] transition-colors",
+                  isCritical ? "border-destructive/40 text-destructive bg-destructive/5" : "opacity-70 hover:opacity-100 active:opacity-90"
                 )}>
-                  {isCritical && <Lock size={14} className="mr-2 animate-pulse" />}
-                  {activeAsset?.name || 'Select Mandate'} 
-                  {!isCritical && <ChevronDown size={14} />}
+                  {isCritical && <Lock size={16} className="shrink-0 animate-pulse" />}
+                  <span className="truncate max-w-[180px] sm:max-w-[220px]">{activeAsset?.name || 'Select Mandate'}</span>
+                  {!isCritical && <ChevronDown size={16} className="shrink-0" />}
                 </button>
               </DropdownMenuTrigger>
               {!isCritical && (() => {
@@ -223,11 +223,12 @@ export default function PresenceAltar() {
       </header>
 
       <section className="flex justify-center py-4 sm:py-6">
-        <button 
+        <button
+          type="button"
           onClick={handleToggleFocus}
-          aria-label={isFocusing ? 'SEAL – end focus session and log time' : 'IGNITE – start focus session'}
+          aria-label={isFocusing ? 'SEAL – end focus session' : 'IGNITE – start focus session'}
           className={cn(
-            "w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 rounded-full flex flex-col items-center justify-center gap-4 sm:gap-8 transition-all duration-1000 luxury-shadow relative group",
+            "min-touch w-44 h-44 sm:w-52 sm:h-52 md:w-60 md:h-60 rounded-full flex flex-col items-center justify-center gap-3 sm:gap-6 transition-all duration-300 luxury-shadow relative group active:scale-[0.98]",
             isFocusing 
               ? "bg-primary/5 border-[1px] border-primary/50 shadow-[0_0_100px_rgba(212,175,55,0.2)] scale-110" 
               : "bg-foreground/5 border-[1px] border-white/10 hover:border-white/20 active:scale-95"
@@ -259,8 +260,8 @@ export default function PresenceAltar() {
       </section>
 
       {isFocusing && activeAsset && activeAnalytics && (
-        <section className="space-y-8 animate-in slide-in-from-bottom-16 duration-1000 px-4">
-          <div className="luxury-blur p-8 rounded-[3rem] border border-white/5 bg-black/40 luxury-shadow relative overflow-hidden">
+        <section className="space-y-6 animate-in slide-in-from-bottom-8 duration-500">
+          <div className="luxury-card p-6 sm:p-8 rounded-3xl relative overflow-hidden">
             <div className="absolute top-0 right-0 p-8 opacity-5">
               <Activity size={80} />
             </div>
