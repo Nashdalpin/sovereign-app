@@ -1,5 +1,5 @@
--- Sovereign app: profiles, assets, session_logs, app_state
--- Run in Supabase SQL Editor after creating a project.
+-- Sovereign app: base schema
+-- Profiles, assets, session_logs, app_state. Run after creating a Supabase project.
 
 -- Profiles (extends auth.users)
 create table if not exists public.profiles (
@@ -8,9 +8,10 @@ create table if not exists public.profiles (
   updated_at timestamptz default now()
 );
 
--- RLS
 alter table public.profiles enable row level security;
+drop policy if exists "Users can read own profile" on public.profiles;
 create policy "Users can read own profile" on public.profiles for select using (auth.uid() = id);
+drop policy if exists "Users can update own profile" on public.profiles;
 create policy "Users can update own profile" on public.profiles for update using (auth.uid() = id);
 
 -- Assets (mandates)
@@ -29,6 +30,7 @@ create table if not exists public.assets (
 );
 
 alter table public.assets enable row level security;
+drop policy if exists "Users can CRUD own assets" on public.assets;
 create policy "Users can CRUD own assets" on public.assets for all using (auth.uid() = user_id);
 
 -- Session logs (focus sessions)
@@ -43,9 +45,10 @@ create table if not exists public.session_logs (
 );
 
 alter table public.session_logs enable row level security;
+drop policy if exists "Users can CRUD own session_logs" on public.session_logs;
 create policy "Users can CRUD own session_logs" on public.session_logs for all using (auth.uid() = user_id);
 
--- App state (vitals, life_tracker, pillar_rituals, etc.) per user per day
+-- App state (vitals, life_tracker, playbook, etc.) per user per day
 create table if not exists public.app_state (
   user_id uuid references auth.users on delete cascade not null,
   last_date text not null,
@@ -61,6 +64,7 @@ create table if not exists public.app_state (
 );
 
 alter table public.app_state enable row level security;
+drop policy if exists "Users can CRUD own app_state" on public.app_state;
 create policy "Users can CRUD own app_state" on public.app_state for all using (auth.uid() = user_id);
 
 -- Trigger to create profile on signup

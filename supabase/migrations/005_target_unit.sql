@@ -1,4 +1,4 @@
--- Optional unit for target/current value (e.g. kg, lbs) so it's not fixed to one measure.
+-- Optional unit for target/current value (e.g. kg, lbs, cm)
 
 alter table public.assets
   add column if not exists target_unit text default null;

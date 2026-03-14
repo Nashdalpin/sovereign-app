@@ -1,22 +1,33 @@
 "use client"
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useFoco, Pillar, SessionLog } from '@/lib/store';
 import {
   AreaChart,
   Area,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { Zap, Clock, PieChart, Sparkles, Banknote } from 'lucide-react';
+import Link from 'next/link';
+import { Zap, Clock, PieChart, Sparkles, Banknote, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { generateWeeklyDebrief } from '@/ai/flows/weekly-debrief-flow';
 import { useToast } from '@/hooks/use-toast';
 
 type PillarHours = Record<Pillar, number>;
 type PillarMoney = Record<Pillar, number>;
+
+type DailySnapshot = {
+  date: string;
+  focusHours: number;
+  integrity: number;
+  targetHours: number;
+  objectivesMet: boolean;
+};
 
 function getTodayLogs(sessionLogs: SessionLog[]): SessionLog[] {
   const today = new Date().toDateString();
@@ -46,15 +57,30 @@ export default function LedgerPage() {
     lifeTracker,
     currentTime,
   } = useFoco();
+
   const [mounted, setMounted] = useState(false);
   const [debrief, setDebrief] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [debriefError, setDebriefError] = useState<string | null>(null);
+  const [snapshots, setSnapshots] = useState<DailySnapshot[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!mounted || !isHydrated) return;
+    const to = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - 30);
+    const fromStr = from.toDateString();
+    const toStr = to.toDateString();
+    fetch(`/api/me/daily-snapshots?from=${encodeURIComponent(fromStr)}&to=${encodeURIComponent(toStr)}`)
+      .then((res) => (res.ok ? res.json() : { snapshots: [] }))
+      .then((data) => setSnapshots(Array.isArray(data.snapshots) ? data.snapshots : []))
+      .catch(() => setSnapshots([]));
+  }, [mounted, isHydrated]);
 
   const todayLogs = useMemo(() => {
     if (!isHydrated) return [];
@@ -228,6 +254,57 @@ export default function LedgerPage() {
     return out;
   }, [assets]);
 
+  const timelineChartData = useMemo(() => {
+    return [...snapshots].reverse().map((s) => ({
+      day: new Date(s.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+      date: s.date,
+      integrity: s.integrity,
+      focus: parseFloat(s.focusHours.toFixed(1)),
+      target: parseFloat(s.targetHours.toFixed(1)),
+    }));
+  }, [snapshots]);
+
+  const handleExport = useCallback((format: 'csv' | 'json') => {
+    const rows = sessionLogs.map((log) => ({
+      date: new Date(log.timestamp).toDateString(),
+      assetName: log.assetName,
+      durationMin: log.duration,
+      timestamp: log.timestamp,
+      mode: log.mode,
+    }));
+    const snapshotRows = snapshots.map((s) => ({
+      date: s.date,
+      focusHours: s.focusHours,
+      targetHours: s.targetHours,
+      objectivesMet: s.objectivesMet,
+      integrity: s.integrity,
+    }));
+    const now = new Date().toISOString().slice(0, 10);
+    if (format === 'csv') {
+      const header = 'date,assetName,durationMin,timestamp,mode\n';
+      const sessionLines = rows.map((r) => `${r.date},${r.assetName},${r.durationMin},${r.timestamp},${r.mode}`).join('\n');
+      const snapHeader = '\ndate,focusHours,targetHours,objectivesMet,integrity\n';
+      const snapLines = snapshotRows.map((r) => `${r.date},${r.focusHours},${r.targetHours},${r.objectivesMet},${r.integrity}`).join('\n');
+      const csv = header + sessionLines + snapHeader + snapLines;
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `progress-${now}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      const json = JSON.stringify({ sessionLogs: rows, dailySnapshots: snapshotRows }, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `progress-${now}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  }, [sessionLogs, snapshots]);
+
   const DEBRIEF_TIMEOUT_MS = 30_000;
 
   const handleGenerateDebrief = async () => {
@@ -314,29 +391,49 @@ export default function LedgerPage() {
   return (
     <div className="max-w-screen-sm mx-auto px-4 sm:px-6 md:px-8 space-y-20 animate-in fade-in duration-1000">
       <header className="space-y-2 text-center">
-        <p className="text-[9px] font-black uppercase tracking-[1em] opacity-20">
+        <p className="text-[9px] font-black uppercase tracking-[1em] opacity-20 gold-glow">
           Audit Records
         </p>
-        <h1 className="text-5xl luxury-text">Ledger.</h1>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <h1 className="text-5xl luxury-text">Ledger.</h1>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => handleExport('csv')}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border dark:border-white/10 text-[9px] font-black uppercase tracking-wider hover:bg-muted/50 transition-colors"
+            >
+              <Download size={12} />
+              CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExport('json')}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border dark:border-white/10 text-[9px] font-black uppercase tracking-wider hover:bg-muted/50 transition-colors"
+            >
+              <Download size={12} />
+              JSON
+            </button>
+          </div>
+        </div>
       </header>
 
       <section className="grid grid-cols-2 gap-6">
-        <div className="luxury-blur p-8 rounded-[2rem] luxury-shadow space-y-2 text-center">
+        <div className="luxury-blur p-8 rounded-[2.5rem] luxury-shadow border border-border dark:border-white/5 space-y-2 text-center">
           <p className="text-[8px] font-bold uppercase tracking-[0.4em] opacity-20">
             Total Equity
           </p>
-          <p className="text-3xl font-light tracking-tighter tabular-nums">
+          <p className="text-3xl font-light tracking-tighter tabular-nums gold-glow">
             {totalInvestment.toFixed(1)}
             <span className="text-[10px] ml-1 opacity-20 font-bold tracking-widest">
               H
             </span>
           </p>
         </div>
-        <div className="luxury-blur p-8 rounded-[2rem] luxury-shadow space-y-2 text-center">
+        <div className="luxury-blur p-8 rounded-[2.5rem] luxury-shadow border border-border dark:border-white/5 space-y-2 text-center">
           <p className="text-[8px] font-bold uppercase tracking-[0.4em] opacity-20">
             Daily Yield
           </p>
-          <p className="text-3xl font-light tracking-tighter tabular-nums text-primary">
+          <p className="text-3xl font-light tracking-tighter tabular-nums text-primary gold-glow">
             {(dailyStats.focus / 3600).toFixed(1)}
             <span className="text-[10px] ml-1 opacity-20 font-bold tracking-widest">
               H
@@ -345,7 +442,7 @@ export default function LedgerPage() {
         </div>
       </section>
 
-      <section className="luxury-blur p-8 rounded-[2.5rem] luxury-shadow space-y-8 min-h-[240px]">
+      <section className="luxury-blur p-8 rounded-[2.5rem] luxury-shadow border border-border dark:border-white/5 space-y-8 min-h-[240px]">
         <div className="flex justify-between items-center">
           <p className="text-[8px] font-bold uppercase tracking-[0.4em] opacity-20">
             Performance Curve
@@ -455,7 +552,7 @@ export default function LedgerPage() {
         </div>
       </section>
 
-      <section className="luxury-blur p-6 rounded-[2rem] luxury-shadow space-y-6">
+      <section className="luxury-blur p-6 rounded-[2.5rem] luxury-shadow border border-border dark:border-white/5 space-y-6">
         <div className="flex justify-between items-center">
           <p className="text-[8px] font-bold uppercase tracking-[0.4em] opacity-20">
             Weekly Pillar Distribution
@@ -530,6 +627,67 @@ export default function LedgerPage() {
         ) : (
           <p className="text-[9px] opacity-40">
             No report yet. Click «Generate Report» above for the Council to analyze the past week.
+          </p>
+        )}
+      </section>
+
+      <section className="luxury-blur p-8 rounded-[2.5rem] luxury-shadow border border-border dark:border-white/5 space-y-6">
+        <div className="flex justify-between items-center">
+          <p className="text-[8px] font-bold uppercase tracking-[0.4em] opacity-20">
+            Timeline (Integrity + Objectives)
+          </p>
+          <span className="text-[8px] font-bold uppercase tracking-[0.4em] opacity-30">
+            Last 30 days
+          </span>
+        </div>
+        {timelineChartData.length > 0 ? (
+          <>
+            <div className="h-[160px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={timelineChartData}>
+                  <XAxis dataKey="day" hide />
+                  <YAxis hide domain={[0, 10]} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(0,0,0,0.8)',
+                      backdropFilter: 'blur(20px)',
+                      borderRadius: '1rem',
+                      border: 'none',
+                      fontSize: '10px',
+                    }}
+                  />
+                  <Line type="monotone" dataKey="integrity" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 2 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="overflow-x-auto -mx-2">
+              <table className="w-full text-left text-[10px] border-collapse">
+                <thead>
+                  <tr className="border-b border-border/50 dark:border-white/10">
+                    <th className="py-2 pr-4 font-bold uppercase tracking-wider opacity-60">Date</th>
+                    <th className="py-2 pr-4 font-bold uppercase tracking-wider opacity-60">Focus (h)</th>
+                    <th className="py-2 pr-4 font-bold uppercase tracking-wider opacity-60">Target (h)</th>
+                    <th className="py-2 pr-4 font-bold uppercase tracking-wider opacity-60">Objective</th>
+                    <th className="py-2 font-bold uppercase tracking-wider opacity-60">Integrity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {snapshots.slice(0, 14).map((s) => (
+                    <tr key={s.date} className="border-b border-border/30 dark:border-white/5">
+                      <td className="py-2 pr-4">{new Date(s.date).toLocaleDateString()}</td>
+                      <td className="py-2 pr-4 tabular-nums">{s.focusHours.toFixed(1)}</td>
+                      <td className="py-2 pr-4 tabular-nums">{s.targetHours.toFixed(1)}</td>
+                      <td className="py-2 pr-4">{s.objectivesMet ? 'Yes' : 'No'}</td>
+                      <td className="py-2 tabular-nums">{s.integrity}/10</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <p className="text-[9px] opacity-40 py-6 text-center">
+            No daily snapshots yet. Snapshots are saved when you open the app on a new day (sealing the previous day).
           </p>
         )}
       </section>

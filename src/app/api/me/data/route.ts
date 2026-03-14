@@ -10,12 +10,13 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const lastDate = searchParams.get('date') ?? new Date().toDateString();
 
-  const [assetsRes, logsRes, entriesRes, stateRes, historyRes] = await Promise.all([
+  const [assetsRes, logsRes, entriesRes, stateRes, historyRes, latestStateRes] = await Promise.all([
     supabase.from('assets').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
     supabase.from('session_logs').select('*').eq('user_id', user.id).order('timestamp', { ascending: true }),
     supabase.from('goal_entries').select('*').eq('user_id', user.id).order('timestamp', { ascending: false }),
     supabase.from('app_state').select('*').eq('user_id', user.id).eq('last_date', lastDate).maybeSingle(),
     supabase.from('ritual_numeric_history').select('ritual_id, date, value').eq('user_id', user.id).order('date', { ascending: false }),
+    supabase.from('app_state').select('last_date').eq('user_id', user.id).order('last_date', { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   if (assetsRes.error) return NextResponse.json({ error: assetsRes.error.message }, { status: 500 });
@@ -23,7 +24,13 @@ export async function GET(request: Request) {
   if (entriesRes.error) return NextResponse.json({ error: entriesRes.error.message }, { status: 500 });
   if (stateRes.error) return NextResponse.json({ error: stateRes.error.message }, { status: 500 });
   if (historyRes.error) return NextResponse.json({ error: historyRes.error.message }, { status: 500 });
+  const latestAppStateDate = latestStateRes.data?.last_date ?? null;
 
+  const normalizeHorizon = (v: unknown): 1 | 5 | 10 => {
+    const n = Number(v);
+    if (n === 5 || n === 10) return n;
+    return 1;
+  };
   const assets = (assetsRes.data ?? []).map((row: Record<string, unknown>) => ({
     id: row.id,
     name: row.name,
@@ -31,7 +38,7 @@ export async function GET(request: Request) {
     priority: row.priority,
     targetHours: Number(row.target_hours),
     investedHours: Number(row.invested_hours),
-    horizonYears: row.horizon_years,
+    horizonYears: normalizeHorizon(row.horizon_years),
     dailyTasks: Array.isArray(row.daily_tasks) ? row.daily_tasks : [],
     createdAt: row.created_at,
     criticalRituals: Array.isArray(row.critical_rituals) ? row.critical_rituals : [],
@@ -69,6 +76,7 @@ export async function GET(request: Request) {
   const appState = row
     ? {
         vitals: (row.vitals as Record<string, boolean>) ?? {},
+        playbookRitualsCompleted: (row.playbook_rituals_completed as Record<string, boolean>) ?? {},
         lifeTracker: (row.life_tracker as object) ?? {},
         ritualDefinitions: row.ritual_definitions ?? undefined,
         pillarRitualsConfig: (row.pillar_rituals_config as Record<string, string[]>) ?? {},
@@ -92,6 +100,7 @@ export async function GET(request: Request) {
     appState,
     ritualNumericHistory,
     lastDate,
+    latestAppStateDate,
   });
 }
 
@@ -143,6 +152,7 @@ export async function POST(request: Request) {
     }>;
     lifeTracker?: object;
     vitals?: Record<string, boolean>;
+    playbookRitualsCompleted?: Record<string, boolean>;
     ritualNumericValues?: Record<string, number>;
     ritualDefinitions?: unknown[];
     lastDate?: string;
@@ -226,12 +236,13 @@ export async function POST(request: Request) {
     }
   }
 
-  if (body.lastDate !== undefined) {
+    if (body.lastDate !== undefined) {
     const { error: upsertErr } = await supabase.from('app_state').upsert(
       {
         user_id: user.id,
         last_date: lastDate,
         vitals: body.vitals ?? {},
+        playbook_rituals_completed: body.playbookRitualsCompleted ?? {},
         life_tracker: body.lifeTracker ?? {},
         ritual_definitions: body.ritualDefinitions ?? null,
         pillar_rituals_config: body.pillarRitualsConfig ?? {},

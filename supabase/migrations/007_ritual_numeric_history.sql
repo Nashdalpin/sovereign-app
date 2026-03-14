@@ -1,4 +1,5 @@
 -- Time series for numeric rituals (e.g. weight over time). One row per user/ritual/date.
+
 create table if not exists public.ritual_numeric_history (
   user_id uuid references auth.users on delete cascade not null,
   ritual_id text not null,
@@ -8,6 +9,7 @@ create table if not exists public.ritual_numeric_history (
 );
 
 alter table public.ritual_numeric_history enable row level security;
+drop policy if exists "Users can CRUD own ritual_numeric_history" on public.ritual_numeric_history;
 create policy "Users can CRUD own ritual_numeric_history"
   on public.ritual_numeric_history for all using (auth.uid() = user_id);
 

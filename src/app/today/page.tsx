@@ -5,28 +5,42 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useFoco } from '@/lib/store';
 import { ChevronDown, Lock, Crown, Shield, Activity, Target, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import { PILLAR_CONFIG } from '@/lib/constants';
 
 const BLOCK_SESSION_KEY = 'sovereign_block_session';
 
 export default function PresenceAltar() {
-  const { assets, lifeTracker, toggleFocus, intensityRequired, isCritical, assetAnalytics, isHydrated, setActiveAssetId, currentTime, getCriticalAsset } = useFoco();
+  const { assets, lifeTracker, toggleFocus, intensityRequired, isCritical, assetAnalytics, isHydrated, setActiveAssetId, currentTime, getCriticalAsset, getSuggestedFocusAsset, getChildrenOf, getNextFocusBlock, currentBlockIndex, setCurrentBlockIndex } = useFoco();
   const { toast } = useToast();
   const [blockSession, setBlockSession] = useState<{ blockIndex: number; suggestedMinutes: number; totalBlocks: number } | null>(null);
 
   const isFocusing = lifeTracker.activeMode === 'focus';
 
   const criticalAsset = getCriticalAsset();
+  const suggestedAsset = getSuggestedFocusAsset();
+  const nextFocusBlock = getNextFocusBlock();
   const hoursOnlyAssets = useMemo(() => assets.filter(a => (a.targetType ?? 'hours') === 'hours'), [assets]);
 
   const activeAssetId = useMemo(() => {
     if (isFocusing) return lifeTracker.activeAssetId;
     if (isCritical && criticalAsset) return criticalAsset.id;
-    const fallback = hoursOnlyAssets.length > 0 ? hoursOnlyAssets[0].id : null;
-    return lifeTracker.activeAssetId || (criticalAsset ? criticalAsset.id : fallback);
-  }, [isFocusing, isCritical, criticalAsset, hoursOnlyAssets, lifeTracker.activeAssetId]);
+    const fallback =
+      nextFocusBlock?.suggestedAssetId ??
+      suggestedAsset?.id ??
+      (hoursOnlyAssets.length > 0 ? hoursOnlyAssets[0].id : null);
+    return lifeTracker.activeAssetId ?? fallback;
+  }, [isFocusing, isCritical, criticalAsset, nextFocusBlock?.suggestedAssetId, suggestedAsset, hoursOnlyAssets, lifeTracker.activeAssetId]);
+
+  useEffect(() => {
+    if (!isHydrated || isFocusing) return;
+    if (lifeTracker.activeAssetId) return;
+    if (suggestedAsset?.id && hoursOnlyAssets.some(a => a.id === suggestedAsset.id)) {
+      setActiveAssetId(suggestedAsset.id);
+    }
+  }, [isHydrated, isFocusing, lifeTracker.activeAssetId, suggestedAsset, hoursOnlyAssets, setActiveAssetId]);
 
   // Timer only when SEAL is off. In focus mode uses real clock so it keeps counting even with app minimized.
   const sessionDisplayTime = useMemo(() => {
@@ -59,6 +73,11 @@ export default function PresenceAltar() {
       if (!activeAssetId) {
         toast({ title: "MANDATE REQUIRED", description: "Select a mandate to activate Presence.", variant: "elegant" });
         return;
+      }
+      // If user starts from Today (no preselected block), bind to the next focus block when it matches the selected mandate.
+      if (!blockSession && currentBlockIndex === null && nextFocusBlock && !nextFocusBlock.blocked && nextFocusBlock.suggestedAssetId === activeAssetId) {
+        setCurrentBlockIndex(nextFocusBlock.index, nextFocusBlock.minutes);
+        setBlockSession({ blockIndex: nextFocusBlock.index, suggestedMinutes: nextFocusBlock.minutes, totalBlocks: nextFocusBlock.totalBlocks });
       }
       toggleFocus(activeAssetId);
     } else {
@@ -107,6 +126,11 @@ export default function PresenceAltar() {
               Block {blockSession.blockIndex + 1} of {blockSession.totalBlocks} · {blockSession.suggestedMinutes} min
             </p>
           )}
+          {!blockSession && nextFocusBlock?.suggestedAssetName && (
+            <p className="text-[9px] font-black uppercase tracking-[0.6em] opacity-35">
+              Next block · {nextFocusBlock.suggestedAssetName} · {nextFocusBlock.minutes} min
+            </p>
+          )}
         </div>
         
         <div className="space-y-10">
@@ -142,19 +166,57 @@ export default function PresenceAltar() {
                   {!isCritical && <ChevronDown size={14} />}
                 </button>
               </DropdownMenuTrigger>
-              {!isCritical && (
-                <DropdownMenuContent align="center" className="rounded-[3rem] border-white/10 p-3 w-[min(100vw-2rem,320px)] max-w-[320px] luxury-blur luxury-shadow bg-card/95 backdrop-blur-3xl">
-                  {hoursOnlyAssets.map(asset => (
-                    <DropdownMenuItem 
-                      key={asset.id} 
-                      onSelect={() => setActiveAssetId(asset.id)}
-                      className="rounded-3xl p-6 cursor-pointer hover:bg-primary/10 transition-colors"
-                    >
-                      <span className="text-[11px] font-bold uppercase tracking-widest">{asset.name}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              )}
+              {!isCritical && (() => {
+                const grouped = PILLAR_CONFIG.flatMap(pillar => {
+                  const roots = hoursOnlyAssets.filter(a => a.category === pillar.id && !a.parentAssetId);
+                  if (roots.length === 0) return [];
+                  return [
+                    { type: 'pillar' as const, id: pillar.id, label: pillar.label },
+                    ...roots.flatMap(root => {
+                      const children = getChildrenOf(root.id);
+                      if (children.length === 0) return [{ type: 'item' as const, asset: root }];
+                      return [
+                        { type: 'goal' as const, id: root.id, name: root.name },
+                        ...children.map(step => ({ type: 'item' as const, asset: step })),
+                      ];
+                    }),
+                  ];
+                });
+                return (
+                  <DropdownMenuContent align="center" className="rounded-[3rem] border-white/10 p-3 w-[min(100vw-2rem,340px)] max-w-[340px] luxury-blur luxury-shadow bg-card/95 backdrop-blur-3xl">
+                    {grouped.map((entry) => {
+                      if (entry.type === 'pillar') {
+                        return (
+                          <DropdownMenuLabel key={entry.id} className="text-[8px] uppercase tracking-wider opacity-50 py-2 px-4">
+                            {entry.label}
+                          </DropdownMenuLabel>
+                        );
+                      }
+                      if (entry.type === 'goal') {
+                        return (
+                          <DropdownMenuLabel key={entry.id} className="text-[8px] uppercase tracking-wider opacity-70 py-1.5 pl-6 pr-4">
+                            {entry.name}
+                          </DropdownMenuLabel>
+                        );
+                      }
+                      return (
+                        <DropdownMenuItem
+                          key={entry.asset.id}
+                          onSelect={() => setActiveAssetId(entry.asset.id)}
+                          className={cn(
+                            "rounded-2xl p-4 cursor-pointer hover:bg-primary/10 transition-colors",
+                            entry.asset.parentAssetId && "pl-8"
+                          )}
+                        >
+                          <span className="text-[11px] font-bold uppercase tracking-widest">
+                            {entry.asset.parentAssetId ? `Step ${entry.asset.stepOrder ?? ''}: ${entry.asset.name}` : entry.asset.name}
+                          </span>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                );
+              })()}
             </DropdownMenu>
           )}
         </div>

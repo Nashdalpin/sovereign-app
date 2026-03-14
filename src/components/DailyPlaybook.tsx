@@ -14,10 +14,12 @@ import {
   Activity,
   CheckCircle2,
   Banknote,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { PILLAR_CONFIG } from "@/lib/constants";
 import { TaskItem } from "@/components/TaskItem";
+import { RITUAL_ICON_MAP } from "@/lib/ritual-icons";
 
 export function DailyPlaybook({
   showHeader = true,
@@ -32,67 +34,54 @@ export function DailyPlaybook({
     assets,
     dailyTargetHours,
     getPriorityAsset,
+    getSuggestedFocusAsset,
+    getActiveMandateAssets,
+    getFocusBlocks,
+    getNextFocusBlock,
     assetAnalytics,
     vitals,
+    playbookRitualsCompleted,
+    togglePlaybookRitual,
     ritualDefinitions,
     intensityRequired,
     isCritical,
     getCriticalAsset,
     completedBlockIndices,
     setCurrentBlockIndex,
-    toggleVital,
     getMissingCriticalRituals,
   } = useFoco();
 
   const criticalAsset = useMemo(() => getCriticalAsset(), [getCriticalAsset]);
-
-  const orderedAssetsForBlocks = useMemo(() => {
-    if (assets.length === 0) return [];
-    const sorted = [...assets]
-      .filter(a => (a.targetType ?? 'hours') === 'hours' && a.investedHours < a.targetHours)
-      .sort((a, b) => {
-        const pA = ['high', 'medium', 'low'].indexOf(a.priority);
-        const pB = ['high', 'medium', 'low'].indexOf(b.priority);
-        if (pA !== pB) return pA - pB;
-        const anaA = assetAnalytics(a.id);
-        const anaB = assetAnalytics(b.id);
-        if (Math.abs(anaB.urgencyFactor - anaA.urgencyFactor) > 0.05) return anaB.urgencyFactor - anaA.urgencyFactor;
-        if (Math.abs(anaB.debtHours - anaA.debtHours) > 0.1) return anaB.debtHours - anaA.debtHours;
-        return b.targetHours - a.targetHours;
-      });
-    return sorted;
-  }, [assets, assetAnalytics]);
+  const suggestedFocusAsset = useMemo(() => getSuggestedFocusAsset(), [getSuggestedFocusAsset]);
 
   const focusBlocks = useMemo(() => {
-    const blockLengthMinutes = 50;
-    const maxBlocks = 3;
-    const recommendedMinutes = Math.max(dailyTargetHours * 60, blockLengthMinutes);
-    const rawBlocks = Math.round(recommendedMinutes / blockLengthMinutes);
-    const blocksCount = Math.max(1, Math.min(maxBlocks, rawBlocks || 1));
-
-    return Array.from({ length: blocksCount }).map((_, index) => {
-      const suggestedAsset = isCritical
-        ? criticalAsset
-        : orderedAssetsForBlocks[index % Math.max(1, orderedAssetsForBlocks.length)];
-      const priorityLabel = suggestedAsset?.priority === 'high' ? 'Alpha' : suggestedAsset?.priority === 'medium' ? 'Beta' : 'Gamma';
-      const analytics = suggestedAsset ? assetAnalytics(suggestedAsset.id) : null;
+    const blocks = getFocusBlocks();
+    return blocks.map((block) => {
+      const asset = block.suggestedAssetId ? assets.find((a) => a.id === block.suggestedAssetId) : null;
+      const priorityLabel = asset?.priority === 'high' ? 'Alpha' : asset?.priority === 'medium' ? 'Beta' : 'Gamma';
+      const analytics = block.suggestedAssetId ? assetAnalytics(block.suggestedAssetId) : null;
       return {
-        label: `Block ${index + 1}`,
-        minutes: blockLengthMinutes,
-        suggestedAssetId: suggestedAsset?.id ?? null,
-        suggestedAssetName: suggestedAsset?.name ?? null,
-        priorityLabel: suggestedAsset ? priorityLabel : null,
+        label: `Block ${block.index + 1}`,
+        minutes: block.minutes,
+        suggestedAssetId: block.suggestedAssetId,
+        suggestedAssetName: block.suggestedAssetName,
+        priorityLabel: asset ? priorityLabel : null,
         urgencyFactor: analytics?.urgencyFactor ?? 0,
-        blocked: isCritical && index > 0,
+        blocked: block.blocked,
       };
     });
-  }, [dailyTargetHours, isCritical, criticalAsset, orderedAssetsForBlocks, assetAnalytics]);
+  }, [getFocusBlocks, assets, assetAnalytics]);
 
   const ritualsList = useMemo(() => {
-    const entries = ritualDefinitions.map((r) => [r.id, !!vitals[r.id]] as const);
-    const incompleteFirst = [...entries].sort(([, a], [, b]) => Number(a) - Number(b));
-    return incompleteFirst.slice(0, 5);
-  }, [vitals, ritualDefinitions]);
+    const missingForSuggested = getMissingCriticalRituals(suggestedFocusAsset ?? null);
+    const entries = ritualDefinitions.map((r) => [r.id, !!playbookRitualsCompleted[r.id]] as const);
+    const priority = (id: string, done: boolean) =>
+      missingForSuggested.includes(id) ? 0 : done ? 2 : 1;
+    const sorted = [...entries].sort(([idA, doneA], [idB, doneB]) =>
+      priority(idA, doneA) - priority(idB, doneB)
+    );
+    return sorted.slice(0, 7);
+  }, [playbookRitualsCompleted, ritualDefinitions, suggestedFocusAsset, getMissingCriticalRituals]);
 
   const ritualById = useMemo(() => Object.fromEntries(ritualDefinitions.map((r) => [r.id, r])), [ritualDefinitions]);
 
@@ -130,11 +119,11 @@ export function DailyPlaybook({
     <div className={cn("space-y-16", className)}>
       {showHeader && (
         <header className="text-center space-y-6">
-          <p className="text-[10px] font-black uppercase tracking-[1.2em] opacity-20 gold-glow">
+          <p className="text-[10px] font-black uppercase tracking-[1.2em] text-muted-foreground gold-glow">
             Daily Playbook
           </p>
           <h1 className="text-5xl luxury-text">Directive.</h1>
-          <p className="text-[9px] font-medium opacity-40 max-w-xs mx-auto">
+          <p className="text-[9px] font-medium text-muted-foreground max-w-xs mx-auto">
             Auto-generated tactical script for today: Alpha mandates, focused blocks and essential rituals.
           </p>
         </header>
@@ -142,12 +131,12 @@ export function DailyPlaybook({
 
       <section className="space-y-4">
         <div className="flex justify-between items-center px-1">
-          <p className="text-[8px] font-black uppercase tracking-[0.8em] opacity-20">
+          <p className="text-[8px] font-black uppercase tracking-[0.8em] text-muted-foreground">
             Alpha Mandates by Pillar
           </p>
           <Link
             href="/sanctuary/vault"
-            className="text-[8px] font-black uppercase tracking-[0.4em] opacity-30 hover:opacity-100 transition-all"
+            className="text-[8px] font-black uppercase tracking-[0.4em] text-muted-foreground hover:text-foreground transition-all"
           >
             Manage Vault
           </Link>
@@ -226,19 +215,22 @@ export function DailyPlaybook({
       <section className="space-y-4">
         <div className="flex flex-col gap-1 px-1">
           <div className="flex justify-between items-center">
-            <p className="text-[8px] font-black uppercase tracking-[0.8em] opacity-20">Focus Blocks</p>
-            <span className="text-[8px] font-black uppercase tracking-[0.4em] opacity-30 flex items-center gap-1">
+            <p className="text-[8px] font-black uppercase tracking-[0.8em] text-muted-foreground">Focus Blocks</p>
+            <span className="text-[8px] font-black uppercase tracking-[0.4em] text-muted-foreground flex items-center gap-1">
               <Clock size={10} />
               {dailyTargetHours.toFixed(1)}H Mandate
             </span>
           </div>
-          <p className="text-[7px] font-bold uppercase tracking-[0.3em] opacity-25">By priority and urgency (Alpha → Beta → Gamma)</p>
+          <p className="text-[7px] font-bold uppercase tracking-[0.3em] text-muted-foreground">By priority and urgency (Alpha → Beta → Gamma)</p>
         </div>
         <div className="grid gap-3">
-          {focusBlocks.map((block, index) => {
-            const completed = completedBlockIndices.includes(index);
-            if (completed) return null;
-            const disabled = block.blocked || block.suggestedAssetId == null;
+          {(() => {
+            const nextBlock = getNextFocusBlock();
+            return focusBlocks.map((block, index) => {
+              const completed = completedBlockIndices.includes(index);
+              if (completed) return null;
+              const disabled = block.blocked || block.suggestedAssetId == null;
+              const isNext = nextBlock?.index === index && !block.blocked;
             const handleClick = () => {
               if (completed || disabled || !block.suggestedAssetId) return;
               setCurrentBlockIndex(index, block.minutes);
@@ -264,6 +256,7 @@ export function DailyPlaybook({
                 className={cn(
                   "luxury-blur p-4 rounded-[2rem] border flex items-center justify-between text-left transition-all w-full",
                   !disabled && "border-border dark:border-white/5 bg-muted/40 dark:bg-black/20 hover:border-primary/20 hover:bg-muted/60 dark:hover:bg-black/30 cursor-pointer",
+                  !disabled && isNext && "border-primary/20 bg-primary/5 dark:bg-primary/10 hover:bg-primary/10 dark:hover:bg-primary/15",
                   disabled && "opacity-50 cursor-not-allowed border-border dark:border-white/5 bg-muted/40 dark:bg-black/20"
                 )}
               >
@@ -274,7 +267,10 @@ export function DailyPlaybook({
                   <div className="min-w-0">
                     <p className="text-[9px] font-black uppercase tracking-[0.4em] opacity-60">
                       {block.label}
-                      {block.priorityLabel && (
+                      {isNext && (
+                        <span className="ml-1.5 text-primary font-bold">· Next</span>
+                      )}
+                      {!isNext && block.priorityLabel && (
                         <span className="ml-1.5 text-primary/70">· {block.priorityLabel}</span>
                       )}
                     </p>
@@ -289,9 +285,66 @@ export function DailyPlaybook({
                 </div>
                 {block.blocked ? (
                   <span className="text-[8px] font-black uppercase tracking-[0.3em] opacity-40">Locked</span>
+                ) : isNext ? (
+                  <span className="text-[8px] font-black uppercase tracking-[0.4em] text-primary/80 shrink-0">Start in Presence</span>
                 ) : (
                   <span className="text-[9px] font-black uppercase tracking-[0.4em] opacity-30 shrink-0">Slot {index + 1}</span>
                 )}
+              </button>
+            );
+          });
+          })()}
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex justify-between items-center px-1">
+          <p className="text-[8px] font-black uppercase tracking-[0.8em] text-muted-foreground">Sustain your mandates</p>
+          <Link
+            href="/sanctuary"
+            className="text-[8px] font-black uppercase tracking-[0.4em] text-muted-foreground hover:text-foreground transition-all flex items-center gap-1"
+          >
+            <Focus size={10} />
+            Open Altar
+          </Link>
+        </div>
+        <p className="text-[7px] font-bold uppercase tracking-[0.3em] text-muted-foreground px-1">Complete these to support your Alpha mandates and Integrity.</p>
+        {integrityMessage && (
+          <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-destructive/90 px-1">
+            {integrityMessage}
+          </p>
+        )}
+        {missingRitualIds.length === 0 && (
+          <p className="text-[8px] font-black uppercase tracking-[0.3em] text-muted-foreground px-1">Integrity set for current mandates.</p>
+        )}
+        <p className="text-[7px] font-medium uppercase tracking-[0.2em] text-muted-foreground/80 px-1">Mark here to track your plan; this drives your Integrity score.</p>
+        <div className="grid gap-3">
+          {ritualsList.map(([id, done]) => {
+            const ritual = ritualById[id];
+            const label = ritual?.label ?? id;
+            const IconComp = ritual && RITUAL_ICON_MAP[ritual.icon] ? RITUAL_ICON_MAP[ritual.icon] : Sparkles;
+            return (
+              <button
+                type="button"
+                key={id}
+                onClick={() => togglePlaybookRitual(id)}
+                aria-label={done ? `Mark ${label} as incomplete` : `Mark ${label} as complete`}
+                aria-pressed={done}
+                className={cn(
+                  "w-full luxury-blur p-5 rounded-[2rem] border transition-all duration-700 luxury-shadow text-left flex items-center justify-between",
+                  done ? "border-primary/40 bg-primary/5" : "border-border dark:border-white/5 bg-muted/40 dark:bg-black/20 hover:border-primary/20 dark:hover:border-white/15"
+                )}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all duration-700",
+                    done ? "bg-primary text-background shadow-[0_0_20px_rgba(212,175,55,0.4)]" : "bg-white/5 dark:bg-black/30 text-white/20"
+                  )}>
+                    <IconComp size={18} strokeWidth={1.5} aria-hidden />
+                  </div>
+                  <p className={cn("text-[10px] font-bold uppercase tracking-widest", done ? "text-primary gold-glow" : "text-muted-foreground")}>{label}</p>
+                </div>
+                {done && <CheckCircle2 size={14} className="text-primary gold-glow shrink-0" aria-hidden />}
               </button>
             );
           })}
@@ -301,10 +354,10 @@ export function DailyPlaybook({
       {assets.some((a) => a.dailyTasks?.length) ? (
         <section className="space-y-4">
           <div className="flex justify-between items-center px-1">
-            <p className="text-[8px] font-black uppercase tracking-[0.8em] opacity-20">Daily Directives</p>
+            <p className="text-[8px] font-black uppercase tracking-[0.8em] text-muted-foreground">Daily Directives</p>
             <Link
               href="/sanctuary/vault"
-              className="text-[8px] font-black uppercase tracking-[0.4em] opacity-30 hover:opacity-100 transition-all"
+              className="text-[8px] font-black uppercase tracking-[0.4em] text-muted-foreground hover:text-foreground transition-all"
             >
               Edit in Vault
             </Link>
@@ -323,51 +376,6 @@ export function DailyPlaybook({
           </div>
         </section>
       ) : null}
-
-      <section className="space-y-4">
-        <div className="flex justify-between items-center px-1">
-          <p className="text-[8px] font-black uppercase tracking-[0.8em] opacity-20">Essential Rituals</p>
-          <Link
-            href="/sanctuary"
-            className="text-[8px] font-black uppercase tracking-[0.4em] opacity-30 hover:opacity-100 transition-all flex items-center gap-1"
-          >
-            <Focus size={10} />
-            Open Altar
-          </Link>
-        </div>
-        {integrityMessage && (
-          <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-destructive/90 px-1">
-            {integrityMessage}
-          </p>
-        )}
-        {missingRitualIds.length === 0 && ritualsList.some(([, done]) => done) && (
-          <p className="text-[8px] font-black uppercase tracking-[0.3em] opacity-30 px-1">Integrity set for current mandates.</p>
-        )}
-        <div className="grid gap-3">
-          {ritualsList.map(([id, done]) => {
-            const ritual = ritualDefinitions.find((r) => r.id === id);
-            const label = ritual?.label ?? id;
-            const desc = ritual?.label ?? "";
-            return (
-              <button
-                type="button"
-                key={id}
-                onClick={() => toggleVital(id)}
-                className={cn(
-                  "luxury-blur p-4 rounded-[2rem] border flex items-center justify-between text-left transition-all w-full hover:border-primary/20 dark:hover:border-white/15",
-                  done ? "border-primary/30 bg-primary/5" : "border-border dark:border-white/5 bg-muted/40 dark:bg-black/20"
-                )}
-              >
-                <div className="space-y-1">
-                  <p className="text-[9px] font-black uppercase tracking-[0.4em] opacity-60">{label}</p>
-                  {desc && <p className="text-[9px] opacity-40">{desc}</p>}
-                </div>
-                {done && <CheckCircle2 className="text-primary gold-glow" size={16} />}
-              </button>
-            );
-          })}
-        </div>
-      </section>
     </div>
   );
 }

@@ -1,6 +1,5 @@
 -- Financial goals: target_type on assets + goal_entries for money contributions
 
--- Extend assets for money goals
 alter table public.assets
   add column if not exists target_type text not null default 'hours' check (target_type in ('hours','money')),
   add column if not exists target_amount numeric default null,
@@ -12,7 +11,6 @@ comment on column public.assets.target_amount is 'Target value when target_type 
 comment on column public.assets.invested_amount is 'Accumulated amount when target_type = money (sum of goal_entries)';
 comment on column public.assets.currency is 'Currency code when target_type = money (e.g. EUR)';
 
--- Entries (deposits) for money goals
 create table if not exists public.goal_entries (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references auth.users on delete cascade not null,
@@ -27,4 +25,5 @@ create index if not exists goal_entries_asset_id_idx on public.goal_entries(asse
 create index if not exists goal_entries_user_id_idx on public.goal_entries(user_id);
 
 alter table public.goal_entries enable row level security;
+drop policy if exists "Users can CRUD own goal_entries" on public.goal_entries;
 create policy "Users can CRUD own goal_entries" on public.goal_entries for all using (auth.uid() = user_id);

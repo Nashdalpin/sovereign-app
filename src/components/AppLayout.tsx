@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Crown, Compass, ShieldCheck, Sun, Moon, ChartNoAxesCombined, LogOut } from "lucide-react";
+import { Crown, ShieldCheck, Sun, Moon, ChartNoAxesCombined, BookOpen, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
@@ -14,7 +14,7 @@ import { createClient } from '@/lib/supabase/client';
 
 const NavItems = [
   { icon: Crown, label: 'Empire', href: '/' },
-  { icon: Compass, label: 'Presence', href: '/today' },
+  { icon: BookOpen, label: 'Playbook', href: '/playbook' },
   { icon: ShieldCheck, label: 'Altar', href: '/sanctuary' },
   { icon: ChartNoAxesCombined, label: 'Progress', href: '/progress' },
 ];
@@ -104,21 +104,21 @@ export function AppLayoutContent({ children }: { children: React.ReactNode }) {
       <nav className="fixed left-1/2 -translate-x-1/2 z-50 w-[94%] max-w-[340px] bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
         <div className="luxury-blur rounded-full luxury-shadow flex justify-around items-center h-16 px-2 border border-border dark:border-white/15 backdrop-blur-3xl bg-card/90 dark:bg-white/[0.08]">
           {NavItems.map((item) => {
-            const isActive = item.href === '/' ? pathname === '/' : pathname === item.href || (item.href === '/sanctuary' && pathname.startsWith('/sanctuary'));
+            const isActive = item.href === '/' ? pathname === '/' : pathname === item.href || (item.href === '/sanctuary' && pathname.startsWith('/sanctuary')) || (item.href === '/playbook' && pathname.startsWith('/playbook'));
             return (
               <Link 
                 key={item.href} 
                 href={item.href} 
                 aria-label={`Go to ${item.label}`}
                 className={cn(
-                  "flex flex-col items-center justify-center flex-1 h-12 rounded-full transition-all duration-500",
-                  isActive ? "text-primary scale-110 gold-glow" : "text-foreground/60 dark:text-foreground/75 hover:text-foreground/90"
+                  "flex flex-col items-center justify-center flex-1 h-12 rounded-full transition-all duration-500 min-w-0",
+                  isActive ? "text-primary scale-110 gold-glow" : "text-foreground/75 dark:text-foreground/80 hover:text-foreground"
                 )}
               >
                 <item.icon size={18} strokeWidth={isActive ? 2.5 : 1.5} />
                 <span className={cn(
                   "text-[6px] font-black uppercase tracking-[0.2em] mt-1 transition-all duration-500 whitespace-nowrap",
-                  isActive ? "opacity-100" : "opacity-0 scale-75"
+                  isActive ? "opacity-100" : "opacity-70 dark:opacity-75"
                 )}>
                   {item.label}
                 </span>

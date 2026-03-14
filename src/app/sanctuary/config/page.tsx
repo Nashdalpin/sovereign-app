@@ -64,7 +64,7 @@ export default function SanctuaryConfigPage() {
   if (!isHydrated) {
     return (
       <div className="max-w-screen-sm mx-auto px-4 sm:px-6 md:px-8 h-[60vh] flex items-center justify-center">
-        <p className="text-[9px] font-black uppercase tracking-[1em] opacity-20 animate-pulse">
+        <p className="text-[9px] font-black uppercase tracking-[1em] text-muted-foreground animate-pulse">
           Initializing...
         </p>
       </div>
@@ -87,13 +87,13 @@ export default function SanctuaryConfigPage() {
           </div>
           <p className="text-[10px] font-black uppercase tracking-[1.2em] opacity-30 gold-glow">Altar Configuration</p>
           <h1 className="text-5xl luxury-text">Maintenance Protocol</h1>
-          <p className="text-[9px] font-medium uppercase tracking-[0.4em] opacity-20 max-w-xs mx-auto">
+          <p className="text-[9px] font-medium uppercase tracking-[0.4em] text-muted-foreground max-w-xs mx-auto">
             Create or remove rituals and set which pillars they appear in.
           </p>
         </div>
       </header>
 
-      <section className="luxury-blur p-6 rounded-[2.5rem] border border-border dark:border-white/5 luxury-shadow bg-muted/40 dark:bg-black/20 space-y-6">
+      <section className="luxury-blur p-6 rounded-[2.5rem] border border-border dark:border-white/5 luxury-shadow space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg luxury-text">Rituals</h2>
           {!showAddForm && (
@@ -241,7 +241,7 @@ export default function SanctuaryConfigPage() {
         </ul>
       </section>
 
-      <section className="luxury-blur p-4 rounded-[2rem] border border-border dark:border-white/5 luxury-shadow bg-muted/40 dark:bg-black/20">
+      <section className="luxury-blur p-4 rounded-[2.5rem] border border-border dark:border-white/5 luxury-shadow">
         <h2 className="text-[10px] font-black uppercase tracking-[0.6em] opacity-30 mb-3">Rituals per pillar</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -296,7 +296,7 @@ export default function SanctuaryConfigPage() {
         </div>
       </section>
 
-      <section className="luxury-blur p-6 rounded-[2.5rem] border border-border dark:border-white/5 luxury-shadow bg-muted/40 dark:bg-black/20 space-y-4">
+      <section className="luxury-blur p-6 rounded-[2.5rem] border border-border dark:border-white/5 luxury-shadow space-y-4">
         <div className="flex items-center gap-3">
           <Watch size={20} className="text-primary opacity-40" />
           <h2 className="text-lg luxury-text">Relógio</h2>

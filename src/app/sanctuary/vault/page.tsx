@@ -6,7 +6,7 @@ import { useFoco, Pillar, Priority } from '@/lib/store';
 import { RITUAL_ICON_MAP } from '@/lib/ritual-icons';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Briefcase, Coins, Heart, User, Plus, Trash2, Gem, AlertTriangle, Zap, ArrowLeft, Settings, ChevronDown, Banknote, GitBranch, Flag, Pencil
+  Briefcase, Coins, Heart, User, Plus, Trash2, Gem, AlertTriangle, Zap, ArrowLeft, Settings, ChevronDown, ChevronUp, Banknote, GitBranch, Flag, Pencil, Check
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
@@ -18,7 +18,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { PILLAR_CONFIG } from '@/lib/constants';
 
 export default function SanctuaryVaultPage() {
-  const { assets, addAsset, addAssetWithLinkedCapital, deleteAsset, updateAsset, isHydrated, assetAnalytics, updateAssetCriticalRituals, getDefaultCriticalRitualsForPillar, ritualDefinitions, updateAssetTasks, addGoalEntry, deleteGoalEntry, getGoalEntriesForAsset, getNextStepInPath, isAssetComplete } = useFoco();
+  const { assets, addAsset, addAssetWithLinkedCapital, deleteAsset, updateAsset, isHydrated, assetAnalytics, updateAssetCriticalRituals, getDefaultCriticalRitualsForPillar, ritualDefinitions, updateAssetTasks, addGoalEntry, deleteGoalEntry, getGoalEntriesForAsset, getNextStepInPath, getChildrenOf, getNextStepOrderForParent, isAssetComplete, currentTime } = useFoco();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [newAsset, setNewAsset] = useState<{
@@ -33,6 +33,9 @@ export default function SanctuaryVaultPage() {
   const [entryNote, setEntryNote] = useState('');
   const [editAssetId, setEditAssetId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{ name: string; category: Pillar; priority: Priority; target: string; horizon: string; parentAssetId: string; stepOrder: string }>({ name: '', category: 'capital', priority: 'medium', target: '', horizon: '1', parentAssetId: '', stepOrder: '1' });
+  const [appliedRefineKey, setAppliedRefineKey] = useState<string | null>(null);
+  const [addStepParentId, setAddStepParentId] = useState<string | null>(null);
+  const [addStepForm, setAddStepForm] = useState<{ name: string; target: string; horizon: string; priority: Priority }>({ name: '', target: '', horizon: '1', priority: 'medium' });
 
   const handleAdd = () => {
     const horizon = parseInt(newAsset.horizon, 10) as 1 | 5 | 10;
@@ -116,6 +119,46 @@ export default function SanctuaryVaultPage() {
     toast({ title: 'Mandate updated', variant: 'elegant' });
   };
 
+  const handleAddStep = () => {
+    if (!addStepParentId || !addStepForm.name.trim()) return;
+    const parent = assets.find((a) => a.id === addStepParentId);
+    if (!parent || (parent.targetType ?? 'hours') !== 'hours') return;
+    const children = getChildrenOf(addStepParentId);
+    const usedHours = children.reduce((sum, c) => sum + (c.targetHours ?? 0), 0);
+    const remainingHours = Math.max(0, parent.targetHours - usedHours);
+    const targetHours = parseFloat(addStepForm.target) || 0;
+    if (targetHours <= 0) {
+      toast({ title: 'Invalid hours', description: 'Enter a positive target for this step.', variant: 'destructive' });
+      return;
+    }
+    if (targetHours > remainingHours) {
+      toast({ title: 'Hours exceed goal', description: `This goal has ${remainingHours.toFixed(0)}h remaining. Reduce the step target or increase the goal's hours.`, variant: 'destructive' });
+      return;
+    }
+    const horizon = parseInt(addStepForm.horizon, 10) as 1 | 5 | 10;
+    const stepOrder = getNextStepOrderForParent(addStepParentId);
+    addAsset(addStepForm.name.trim(), parent.category, addStepForm.priority, targetHours, horizon, undefined, { parentAssetId: addStepParentId, stepOrder });
+    setAddStepParentId(null);
+    setAddStepForm({ name: '', target: '', horizon: '1', priority: 'medium' });
+    toast({ title: 'Step added', description: `"${addStepForm.name.trim()}" added to path.`, variant: 'elegant' });
+  };
+
+  const moveStep = (stepAssetId: string, direction: 'up' | 'down') => {
+    const step = assets.find((a) => a.id === stepAssetId);
+    if (!step?.parentAssetId) return;
+    const siblings = getChildrenOf(step.parentAssetId);
+    const idx = siblings.findIndex((a) => a.id === stepAssetId);
+    if (idx < 0) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= siblings.length) return;
+    const other = siblings[swapIdx];
+    const orderA = step.stepOrder ?? idx + 1;
+    const orderB = other.stepOrder ?? swapIdx + 1;
+    updateAsset(step.id, { stepOrder: orderB });
+    updateAsset(other.id, { stepOrder: orderA });
+    toast({ title: 'Step reordered', variant: 'elegant' });
+  };
+
   const viability = useMemo(() => {
     const years = parseInt(newAsset.horizon) || 1;
     const isMoney = (newAsset.category === 'capital' && newAsset.targetType === 'money') || (newAsset.category !== 'capital' && newAsset.targetType === 'money');
@@ -145,41 +188,74 @@ export default function SanctuaryVaultPage() {
     payload: { targetHours?: number; horizonYears?: 1 | 5 | 10; priority?: Priority };
     label: string;
   };
-  const refineSuggestions = useMemo((): RefineSuggestion[] => {
-    const reduceTarget: RefineSuggestion[] = [];
-    const downgrade: RefineSuggestion[] = [];
-    const extendHorizon: RefineSuggestion[] = [];
-    for (const asset of assets) {
-      if ((asset.targetType ?? 'hours') === 'money') continue;
-      const ana = assetAnalytics(asset.id);
-      if (ana.status === 'critical') {
-        const remaining = asset.targetHours - (asset.investedHours || 0);
-        if (remaining > 0 && ana.urgencyFactor > 0) {
-          const raw = asset.investedHours + remaining / ana.urgencyFactor;
-          const suggestedTarget = Math.max(asset.investedHours + 1, Math.round(raw / 25) * 25);
-          if (suggestedTarget < asset.targetHours) {
-            reduceTarget.push({ assetId: asset.id, asset, type: 'reduce_target', payload: { targetHours: suggestedTarget }, label: `Reduce target to ${suggestedTarget}h` });
-          }
-        }
-        if (asset.horizonYears === 1) {
-          extendHorizon.push({ assetId: asset.id, asset, type: 'extend_horizon', payload: { horizonYears: 5 }, label: 'Extend horizon to 5Y (last resort)' });
-        } else if (asset.horizonYears === 5) {
-          extendHorizon.push({ assetId: asset.id, asset, type: 'extend_horizon', payload: { horizonYears: 10 }, label: 'Extend horizon to 10Y (last resort)' });
-        }
-      }
-      if (asset.priority === 'high') {
-        if (ana.dailyRequired > 10 || ana.dailyRequired > 5) {
-          downgrade.push({ assetId: asset.id, asset, type: 'downgrade_priority', payload: { priority: 'medium' }, label: 'Downgrade to Beta (medium)' });
-        }
+  const SUSTAINABLE_DAILY_HOURS = 5;
+  function getRefineSuggestionsForAsset(asset: typeof assets[0]): RefineSuggestion[] {
+    if ((asset.targetType ?? 'hours') === 'money') return [];
+    const ana = assetAnalytics(asset.id);
+    const list: RefineSuggestion[] = [];
+
+    const totalDays = asset.horizonYears * 365;
+    const daysPassed = Math.max(0, Math.floor((currentTime - new Date(asset.createdAt).getTime()) / (1000 * 60 * 60 * 24)));
+    const behindOrCritical = (ana.status === 'critical' || (ana.status === 'behind' && ana.urgencyFactor > 1.25))
+      && (daysPassed >= 7 || ana.debtHours > 5);
+    const unsustainableFromStart = ana.dailyRequired > SUSTAINABLE_DAILY_HOURS;
+    const showRefine = behindOrCritical || unsustainableFromStart;
+    if (!showRefine) return list;
+
+    const remaining = asset.targetHours - (asset.investedHours || 0);
+
+    // 1st: Reduce target (adjust goal from metrics: invested hours + time → sustainable target)
+    let reduceSuggested = false;
+    if (remaining > 0 && ana.urgencyFactor > 0) {
+      const raw = asset.investedHours + remaining / ana.urgencyFactor;
+      const suggestedTarget = Math.max(asset.investedHours + 1, Math.round(raw / 25) * 25);
+      const viable = suggestedTarget < asset.targetHours && suggestedTarget > asset.investedHours + 10;
+      if (viable) {
+        list.push({ assetId: asset.id, asset, type: 'reduce_target', payload: { targetHours: suggestedTarget }, label: `Reduce to ${suggestedTarget}h` });
+        reduceSuggested = true;
       }
     }
-    return [...reduceTarget, ...downgrade, ...extendHorizon];
-  }, [assets, assetAnalytics]);
+
+    // 2nd: Downgrade (Beta + extend horizon when needed so years and hours/day change)
+    if (asset.priority === 'high' && ana.dailyRequired > 5) {
+      const extendHorizon = asset.horizonYears === 1 ? 5 : asset.horizonYears === 5 ? 10 : null;
+      if (extendHorizon !== null) {
+        list.push({
+          assetId: asset.id,
+          asset,
+          type: 'downgrade_priority',
+          payload: { priority: 'medium', horizonYears: extendHorizon as 5 | 10 },
+          label: `Beta + ${extendHorizon}Y`,
+        });
+      } else {
+        list.push({ assetId: asset.id, asset, type: 'downgrade_priority', payload: { priority: 'medium' }, label: 'Downgrade to Beta' });
+      }
+    }
+
+    // 3rd: Extend years — last resort only when reduce wasn't viable or debt is very high; skip if we already offer same horizon via Beta + X Y
+    const extendAsLastResort = !reduceSuggested || ana.debtHours > 30;
+    const alreadyExtendViaDowngrade = list.some((s) => s.type === 'downgrade_priority' && s.payload.horizonYears != null);
+    if (extendAsLastResort && !alreadyExtendViaDowngrade) {
+      const horizon = asset.horizonYears === 1 ? 5 : asset.horizonYears === 5 ? 10 : null;
+      if (horizon !== null) {
+        list.push({ assetId: asset.id, asset, type: 'extend_horizon', payload: { horizonYears: horizon as 5 | 10 }, label: `Extend to ${horizon}Y (last)` });
+      }
+    }
+
+    return list;
+  }
+
+  const handleApplyRefine = (s: RefineSuggestion) => {
+    const key = `${s.assetId}-${s.type}`;
+    updateAsset(s.assetId, s.payload);
+    setAppliedRefineKey(key);
+    window.setTimeout(() => setAppliedRefineKey(null), 2000);
+  };
 
   if (!isHydrated) {
     return (
       <div className="max-w-screen-sm mx-auto px-4 sm:px-6 md:px-8 h-[60vh] flex items-center justify-center">
-        <p className="text-[9px] font-black uppercase tracking-[1em] opacity-20 animate-pulse">
+        <p className="text-[9px] font-black uppercase tracking-[1em] text-muted-foreground animate-pulse">
           Initializing Vault...
         </p>
       </div>
@@ -211,38 +287,9 @@ export default function SanctuaryVaultPage() {
         </div>
       </header>
 
-      {refineSuggestions.length > 0 && (
-        <section className="space-y-6 animate-in slide-in-from-bottom-4 duration-700">
-          <h2 className="text-[10px] font-black uppercase tracking-[1em] opacity-30 flex items-center gap-2">
-            <Zap size={14} className="text-primary" />
-            Refine Vault
-          </h2>
-          <div className="grid gap-4 px-2">
-            {refineSuggestions.map((s) => (
-              <div
-                key={`${s.assetId}-${s.type}-${s.label}`}
-                className="luxury-blur p-6 rounded-[2rem] border border-border dark:border-white/5 bg-muted/40 dark:bg-black/20 flex flex-wrap items-center justify-between gap-4"
-              >
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">{s.asset.name}</p>
-                  <p className="text-[9px] font-bold uppercase tracking-wider opacity-50">{s.label}</p>
-                </div>
-                <button
-                  onClick={() => updateAsset(s.assetId, s.payload)}
-                  aria-label={`Apply suggestion: ${s.label}`}
-                  className="px-4 py-2 rounded-full border border-primary/40 bg-primary/10 text-primary text-[9px] font-bold uppercase tracking-wider hover:bg-primary hover:text-background transition-all"
-                >
-                  Apply
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
       <section className="space-y-12">
         <div className="flex justify-between items-center px-4">
-          <p className="text-[10px] font-black uppercase tracking-[1em] opacity-15">Mandates Inventory</p>
+          <p className="text-[10px] font-black uppercase tracking-[1em] text-muted-foreground">Mandates Inventory</p>
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
               <button aria-label="Add new mandate" className="w-16 h-16 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-background transition-all border border-primary/20 flex items-center justify-center luxury-shadow gold-glow active:scale-90">
@@ -250,8 +297,8 @@ export default function SanctuaryVaultPage() {
               </button>
             </DialogTrigger>
             <DialogContent className="rounded-[3rem] border border-primary/20 luxury-blur p-6 sm:p-8 bg-card/95 backdrop-blur-3xl max-w-[94vw] sm:max-w-lg mx-auto overflow-y-auto max-h-[85dvh]">
+              <DialogTitle className="text-4xl luxury-text text-center">Forge.</DialogTitle>
               <DialogHeader className="text-center space-y-4 mb-6 sm:mb-8">
-                <DialogTitle className="text-4xl luxury-text">Forge.</DialogTitle>
                 <DialogDescription className="text-[9px] uppercase tracking-[0.5em] text-muted-foreground">Establish New Strategic Mandate</DialogDescription>
               </DialogHeader>
 
@@ -488,14 +535,12 @@ export default function SanctuaryVaultPage() {
           const pillarAssets = assets.filter(a => a.category === pillar.id);
           if (pillarAssets.length === 0) return null;
 
-          const sortedAssets = [...pillarAssets].sort((a, b) => {
-            const aRoot = a.parentAssetId ?? a.id;
-            const bRoot = b.parentAssetId ?? b.id;
-            if (aRoot !== bRoot) return aRoot.localeCompare(bRoot);
-            const orderA = a.stepOrder ?? 0;
-            const orderB = b.stepOrder ?? 0;
-            return orderA - orderB;
-          });
+          const hoursRoots = pillarAssets.filter(a => !a.parentAssetId && (a.targetType ?? 'hours') === 'hours');
+          const moneyAssets = pillarAssets.filter(a => (a.targetType ?? 'hours') === 'money');
+          const groups: { root: typeof assets[0]; children: typeof assets }[] = [
+            ...hoursRoots.map(root => ({ root, children: getChildrenOf(root.id) })),
+            ...moneyAssets.map(root => ({ root, children: [] as typeof assets })),
+          ].sort((a, b) => a.root.name.localeCompare(b.root.name));
 
           return (
             <div key={pillar.id} className="space-y-8 animate-in slide-in-from-bottom-8 duration-1000">
@@ -505,7 +550,7 @@ export default function SanctuaryVaultPage() {
               </div>
 
               <div className="grid gap-6 px-2">
-                {sortedAssets.map(asset => {
+                {groups.map(({ root: asset, children }) => {
                   const isMoney = (asset.targetType ?? 'hours') === 'money';
                   const ana = assetAnalytics(asset.id);
                   const progress = isMoney
@@ -513,17 +558,13 @@ export default function SanctuaryVaultPage() {
                     : Math.min(100, (asset.targetHours > 0 ? (asset.investedHours / asset.targetHours) * 100 : 0));
                   const entries = getGoalEntriesForAsset(asset.id);
                   const isNextStep = !isMoney && getNextStepInPath(pillar.id)?.id === asset.id;
-                  const isChild = !!asset.parentAssetId;
-                  const parentName = asset.parentAssetId ? assets.find(a => a.id === asset.parentAssetId)?.name : null;
 
                   return (
-                    <div key={asset.id} className={cn("luxury-blur p-8 rounded-[3rem] border border-border dark:border-white/5 luxury-shadow bg-muted/40 dark:bg-black/30 relative overflow-hidden group", isChild && "ml-4 sm:ml-6 border-l-2 border-l-primary/20")}>
+                    <div key={asset.id} className="luxury-blur p-8 rounded-[3rem] border border-border dark:border-white/5 luxury-shadow bg-muted/40 dark:bg-black/30 relative overflow-hidden group">
                       <div className="flex justify-between items-start mb-6">
                         <div className="space-y-2">
                           <div className="flex items-center gap-4 flex-wrap">
-                            {isChild && <span className="text-[8px] font-black uppercase opacity-40">Step {asset.stepOrder ?? '?'}</span>}
                             <p className="text-lg font-light">{asset.name}</p>
-                            {parentName && <span className="text-[8px] font-bold uppercase opacity-50">→ {parentName}</span>}
                             {isNextStep && <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/40">Next step</span>}
                             {isMoney && <span className="text-[8px] font-black uppercase text-primary opacity-70 flex items-center gap-1"><Banknote size={10} /> €</span>}
                             <span className={cn(
@@ -541,6 +582,15 @@ export default function SanctuaryVaultPage() {
                           </p>
                         </div>
                         <div className="flex items-center gap-1">
+                          {!isMoney && (
+                            <button
+                              onClick={() => { setAddStepParentId(asset.id); setAddStepForm({ name: '', target: '', horizon: String(asset.horizonYears), priority: asset.priority }); }}
+                              className="p-3 opacity-40 hover:opacity-100 transition-all hover:scale-110 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider"
+                              aria-label={`Add step to ${asset.name}`}
+                            >
+                              <Plus size={12} /> Add step
+                            </button>
+                          )}
                           <button onClick={() => openEdit(asset)} className="p-3 opacity-40 hover:opacity-100 transition-all hover:scale-110" aria-label={`Edit ${asset.name}`}>
                             <Pencil size={14} />
                           </button>
@@ -570,6 +620,49 @@ export default function SanctuaryVaultPage() {
                         </div>
                       </div>
 
+                      {!isMoney && children.length > 0 && (() => {
+                        const usedHours = children.reduce((s, c) => s + (c.targetHours ?? 0), 0);
+                        const remainingHours = Math.max(0, asset.targetHours - usedHours);
+                        return (
+                          <div className="mt-4 pt-4 border-t border-border dark:border-white/5">
+                            <p className="text-[8px] font-black uppercase tracking-[0.4em] opacity-50 mb-3 flex items-center gap-1.5">
+                              <Flag size={10} /> Path · {usedHours.toFixed(0)}h allocated · {remainingHours.toFixed(0)}h remaining
+                            </p>
+                            <div className="space-y-2">
+                              {children.map((step) => {
+                                const stepAna = assetAnalytics(step.id);
+                                const stepProgress = step.targetHours > 0 ? Math.min(100, (step.investedHours / step.targetHours) * 100) : 0;
+                                const stepIsNext = getNextStepInPath(pillar.id)?.id === step.id;
+                                return (
+                                  <div key={step.id} className="rounded-[2rem] border-l-2 border-l-primary/20 bg-muted/30 dark:bg-white/5 p-4 sm:p-5 transition-all">
+                                    <div className="flex justify-between items-start gap-2">
+                                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                        <span className="text-[8px] font-black uppercase opacity-60 shrink-0">Step {step.stepOrder ?? '?'}</span>
+                                        <p className="text-sm font-light truncate">{step.name}</p>
+                                        {stepIsNext && <span className="text-[7px] font-black uppercase px-1.5 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/40 shrink-0">Next</span>}
+                                      </div>
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        <button onClick={() => moveStep(step.id, 'up')} className="p-2 opacity-40 hover:opacity-100 transition-all" aria-label="Move step up"><ChevronUp size={12} /></button>
+                                        <button onClick={() => moveStep(step.id, 'down')} className="p-2 opacity-40 hover:opacity-100 transition-all" aria-label="Move step down"><ChevronDown size={12} /></button>
+                                        <button onClick={() => openEdit(step)} className="p-2 opacity-40 hover:opacity-100 transition-all" aria-label={`Edit ${step.name}`}><Pencil size={12} /></button>
+                                        <button onClick={() => deleteAsset(step.id)} className="p-2 opacity-15 hover:opacity-100 transition-all text-destructive" aria-label={`Delete ${step.name}`}><Trash2 size={12} /></button>
+                                      </div>
+                                    </div>
+                                    <div className="flex justify-between text-[9px] tabular-nums font-medium opacity-60 mt-2">
+                                      <span>{step.investedHours.toFixed(1)}h / {step.targetHours}h</span>
+                                      <span className="gold-glow">{stepProgress.toFixed(0)}%</span>
+                                    </div>
+                                    <div className="h-1 w-full bg-foreground/5 rounded-full overflow-hidden mt-1.5">
+                                      <div className={cn("h-full transition-all duration-1000", stepAna.status === 'critical' ? 'bg-destructive' : 'bg-primary gold-glow')} style={{ width: `${stepProgress}%` }} />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       {!isMoney && ana.debtHours > 5 && (
                         <div className="mt-4 pt-4 border-t border-border dark:border-white/5 flex items-center justify-between">
                           <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-destructive flex items-center gap-2">
@@ -580,6 +673,48 @@ export default function SanctuaryVaultPage() {
                           </p>
                         </div>
                       )}
+
+                      {!isMoney && (() => {
+                        const refineSuggestions = getRefineSuggestionsForAsset(asset);
+                        if (refineSuggestions.length === 0) return null;
+                        return (
+                          <div className="mt-3 pt-3 border-t border-border dark:border-white/5 flex flex-wrap items-center gap-1.5">
+                            <span className="text-[7px] font-black uppercase tracking-wider opacity-40 mr-0.5">Refine</span>
+                            {refineSuggestions.map((s) => {
+                              const key = `${s.assetId}-${s.type}`;
+                              const justApplied = appliedRefineKey === key;
+                              const extendHint = s.type === 'reduce_target'
+                                ? 'Adjust goal to sustainable level based on invested hours and time (first option).'
+                                : s.type === 'extend_horizon'
+                                  ? (s.label.includes('(last)') ? 'Last resort: extend timeline when reducing the goal isn\'t viable. Same goal, more time → fewer hours/day.' : 'Extend timeline → fewer hours per day (same goal, more time).')
+                                  : s.type === 'downgrade_priority' && s.payload.horizonYears
+                                    ? 'Lower priority to Beta and extend timeline → years and hours/day update.'
+                                    : s.type === 'downgrade_priority'
+                                      ? 'Only changes priority (Alpha→Beta).'
+                                      : undefined;
+                              return (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  onClick={() => !justApplied && handleApplyRefine(s)}
+                                  disabled={justApplied}
+                                  title={extendHint}
+                                  aria-label={justApplied ? 'Applied' : `Apply: ${s.label}`}
+                                  className={cn(
+                                    "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[7px] font-bold uppercase tracking-wider transition-all",
+                                    justApplied
+                                      ? "border border-primary/50 bg-primary/10 text-primary"
+                                      : "border border-primary/40 bg-primary/5 text-primary hover:bg-primary hover:text-background"
+                                  )}
+                                >
+                                  {justApplied ? <Check size={10} strokeWidth={2.5} /> : null}
+                                  <span>{justApplied ? 'Ok' : s.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
 
                       {isMoney && (
                         <div className="mt-4 pt-4 border-t border-border dark:border-white/5 space-y-3">
@@ -656,17 +791,85 @@ export default function SanctuaryVaultPage() {
         })}
 
         {assets.length === 0 && (
-          <div className="py-24 text-center opacity-30 dark:opacity-10 border border-dashed border-border dark:border-white/10 rounded-[3rem] flex flex-col items-center gap-6">
-            <Gem size={40} strokeWidth={1} />
-            <p className="text-[10px] font-black uppercase tracking-[1em]">Portfolio Vault Empty</p>
+          <div className="py-24 text-center border border-dashed border-border dark:border-white/10 rounded-[3rem] flex flex-col items-center gap-6">
+            <Gem size={40} strokeWidth={1} className="text-muted-foreground" />
+            <p className="text-[10px] font-black uppercase tracking-[1em] text-muted-foreground">
+              Portfolio Vault Empty
+            </p>
           </div>
         )}
       </section>
 
+      <Dialog open={addStepParentId != null} onOpenChange={(open) => !open && (setAddStepParentId(null), setAddStepForm({ name: '', target: '', horizon: '1', priority: 'medium' }))}>
+        <DialogContent className="rounded-[3rem] border border-primary/20 luxury-blur p-6 sm:p-8 bg-card/95 backdrop-blur-3xl max-w-[94vw] sm:max-w-md mx-auto">
+          <DialogTitle className="text-xl luxury-text">Add step</DialogTitle>
+          <DialogHeader>
+            <DialogDescription className="text-[9px] uppercase tracking-[0.5em] text-muted-foreground">
+              {addStepParentId ? assets.find(a => a.id === addStepParentId)?.name : ''}
+            </DialogDescription>
+          </DialogHeader>
+          {addStepParentId && (() => {
+            const parent = assets.find(a => a.id === addStepParentId);
+            if (!parent) return null;
+            const children = getChildrenOf(addStepParentId);
+            const usedHours = children.reduce((s, c) => s + (c.targetHours ?? 0), 0);
+            const remainingHours = Math.max(0, parent.targetHours - usedHours);
+            const nextOrder = getNextStepOrderForParent(addStepParentId);
+            return (
+              <div className="space-y-4 pt-2">
+                <div className="rounded-full px-4 py-2 bg-muted/50 dark:bg-white/5 text-[10px] font-bold uppercase tracking-wider opacity-80">
+                  Step {nextOrder} · Up to {remainingHours.toFixed(0)}h remaining in this goal
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground">Step name</Label>
+                  <Input value={addStepForm.name} onChange={(e) => setAddStepForm(f => ({ ...f, name: e.target.value }))} className="rounded-full h-11 bg-muted/50 border border-border dark:border-white/10 px-4" placeholder="e.g. Research phase" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground">Target (hours)</Label>
+                  <Input type="number" min={0} step={1} value={addStepForm.target} onChange={(e) => setAddStepForm(f => ({ ...f, target: e.target.value }))} className="rounded-full h-11 bg-muted/50 border border-border dark:border-white/10 px-4" placeholder={remainingHours.toFixed(0)} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground">Horizon</Label>
+                    <Select value={addStepForm.horizon} onValueChange={(v) => setAddStepForm(f => ({ ...f, horizon: v }))}>
+                      <SelectTrigger className="rounded-full h-11 bg-muted/50 border border-border dark:border-white/10 px-4 text-[10px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-border dark:border-white/10 bg-card">
+                        <SelectItem value="1">1 Year</SelectItem>
+                        <SelectItem value="5">5 Years</SelectItem>
+                        <SelectItem value="10">10 Years</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground">Priority</Label>
+                    <Select value={addStepForm.priority} onValueChange={(v) => setAddStepForm(f => ({ ...f, priority: v as Priority }))}>
+                      <SelectTrigger className="rounded-full h-11 bg-muted/50 border border-border dark:border-white/10 px-4 text-[10px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-border dark:border-white/10 bg-card">
+                        <SelectItem value="high">Alpha</SelectItem>
+                        <SelectItem value="medium">Beta</SelectItem>
+                        <SelectItem value="low">Gamma</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button onClick={() => { setAddStepParentId(null); setAddStepForm({ name: '', target: '', horizon: '1', priority: 'medium' }); }} className="flex-1 py-3 rounded-full border border-border dark:border-white/10 text-[10px] font-bold uppercase tracking-wider">Cancel</button>
+                  <button onClick={handleAddStep} disabled={!addStepForm.name.trim() || !(parseFloat(addStepForm.target) > 0)} className="flex-1 py-3 rounded-full bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-wider hover:opacity-90 disabled:opacity-50">Add step</button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={entryModalAssetId != null} onOpenChange={(open) => !open && setEntryModalAssetId(null)}>
         <DialogContent className="rounded-[3rem] border border-primary/20 luxury-blur p-6 sm:p-8 bg-card/95 backdrop-blur-3xl max-w-[94vw] sm:max-w-md mx-auto">
+          <DialogTitle className="text-xl luxury-text">Add entry</DialogTitle>
           <DialogHeader>
-            <DialogTitle className="text-xl luxury-text">Add entry</DialogTitle>
             <DialogDescription className="text-[9px] uppercase tracking-[0.5em] text-muted-foreground">
               {entryModalAssetId ? assets.find(a => a.id === entryModalAssetId)?.name : ''}
             </DialogDescription>
@@ -711,9 +914,9 @@ export default function SanctuaryVaultPage() {
       </Dialog>
 
       <Dialog open={editAssetId != null} onOpenChange={(open) => !open && setEditAssetId(null)}>
-        <DialogContent className="rounded-[3rem] border border-primary/20 luxury-blur p-6 sm:p-8 bg-card/95 backdrop-blur-3xl max-w-[94vw] sm:max-w-md mx-auto" aria-labelledby="edit-mandate-title">
+        <DialogContent className="rounded-[3rem] border border-primary/20 luxury-blur p-6 sm:p-8 bg-card/95 backdrop-blur-3xl max-w-[94vw] sm:max-w-md mx-auto">
+          <DialogTitle className="text-xl luxury-text">Edit mandate</DialogTitle>
           <DialogHeader>
-            <DialogTitle id="edit-mandate-title" className="text-xl luxury-text">Edit mandate</DialogTitle>
             <DialogDescription className="text-[9px] uppercase tracking-[0.5em] text-muted-foreground">
               {editAssetId ? assets.find(a => a.id === editAssetId)?.name : ''}
             </DialogDescription>

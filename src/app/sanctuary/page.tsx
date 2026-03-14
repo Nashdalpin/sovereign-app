@@ -33,7 +33,7 @@ function NumericRitualHistory({ ritualId, history, unit, maxPoints = 7 }: { ritu
 }
 
 export default function SanctuaryPage() {
-  const { vitals, toggleVital, currentVitality, isHydrated, getPriorityAsset, assetAnalytics, getPillarRituals, ritualDefinitions, assets, addGoalEntry, ritualNumericValues, ritualNumericHistory, setRitualNumericValue } = useFoco();
+  const { vitals, toggleVital, isHydrated, getPriorityAsset, getChildrenOf, assetAnalytics, getPillarRituals, ritualDefinitions, assets, addGoalEntry, ritualNumericValues, ritualNumericHistory, setRitualNumericValue } = useFoco();
   const ritualById = Object.fromEntries(ritualDefinitions.map((r) => [r.id, r]));
   const { toast } = useToast();
   const [entryModalAssetId, setEntryModalAssetId] = useState<string | null>(null);
@@ -74,7 +74,7 @@ export default function SanctuaryPage() {
   if (!isHydrated) {
     return (
       <div className="max-w-screen-sm mx-auto px-4 sm:px-6 md:px-8 h-[60vh] flex items-center justify-center">
-        <p className="text-[9px] font-black uppercase tracking-[1em] opacity-20 animate-pulse">
+        <p className="text-[9px] font-black uppercase tracking-[1em] text-muted-foreground animate-pulse">
           Initializing Altar...
         </p>
       </div>
@@ -95,23 +95,12 @@ export default function SanctuaryPage() {
         </Link>
       </header>
 
-      <section className="flex flex-col items-center py-4">
-        <div className="relative group">
-          <div className="w-40 h-40 rounded-full border border-white/10 flex flex-col items-center justify-center luxury-blur luxury-shadow relative z-10 bg-black/30 group-hover:border-primary/20 transition-all duration-700">
-            <p className="text-5xl font-light tabular-nums luxury-text">{currentVitality}<span className="text-base opacity-20">/10</span></p>
-            <p className="text-[8px] font-black uppercase tracking-[0.4em] opacity-30 mt-2">Integrity</p>
-          </div>
-          <div className="absolute -inset-4 rounded-full border border-primary/5 animate-[spin_120s_linear_infinite] border-dashed" />
-          <div className="absolute -inset-8 rounded-full border border-foreground/5 animate-[spin_180s_linear_reverse_infinite]" />
-        </div>
-      </section>
-
       <Tabs defaultValue="vitality" className="w-full space-y-12">
-        <TabsList className="w-full h-14 bg-white/[0.02] rounded-full p-1.5 luxury-blur flex justify-between border border-white/10">
+        <TabsList className="w-full h-14 bg-muted/50 dark:bg-white/10 rounded-full p-1.5 luxury-blur flex justify-between border border-border dark:border-white/15">
           {PILLAR_CONFIG.map(p => (
             <TabsTrigger 
               key={p.id} value={p.id}
-              className="flex-1 rounded-full data-[state=active]:bg-foreground data-[state=active]:text-background transition-all duration-700 py-1.5"
+              className="flex-1 rounded-full text-muted-foreground data-[state=active]:bg-foreground data-[state=active]:text-background transition-all duration-700 py-1.5"
             >
               <p.icon size={16} strokeWidth={1.5} />
             </TabsTrigger>
@@ -133,12 +122,12 @@ export default function SanctuaryPage() {
               <TabsContent key={pillar.id} value={pillar.id} className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
                 <div className="text-center space-y-1">
                   <h2 className="text-2xl luxury-text">Capital</h2>
-                  <p className="text-[8px] font-bold uppercase tracking-[0.6em] opacity-20">Finance & savings goals</p>
+                  <p className="text-[8px] font-bold uppercase tracking-[0.6em] text-muted-foreground">Finance & savings goals</p>
                 </div>
 
                 {getPillarRituals(pillar.id).length > 0 && (
                   <div className="space-y-6">
-                    <p className="text-[8px] font-black uppercase tracking-[0.8em] opacity-10 px-2">Maintenance Protocol</p>
+                    <p className="text-[8px] font-black uppercase tracking-[0.8em] text-muted-foreground px-2">Maintenance Protocol</p>
                     <div className="grid gap-3">
                       {getPillarRituals(pillar.id).map(rid => {
                         const ritual = ritualById[rid];
@@ -154,16 +143,16 @@ export default function SanctuaryPage() {
                               role="group"
                               aria-labelledby={`ritual-num-${rid}-label`}
                               className={cn(
-                                "w-full luxury-blur p-5 rounded-[2rem] border transition-all duration-700 luxury-shadow",
-                                hasValue ? "border-primary/40 bg-primary/5" : "border-white/5 opacity-80"
+                                "w-full luxury-blur p-4 rounded-[2rem] border transition-all duration-700",
+                                hasValue ? "border-primary/30 bg-primary/5" : "border-white/5 opacity-80"
                               )}
                             >
-                              <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-3">
                                 <div className={cn(
-                                  "w-10 h-10 rounded-full flex items-center justify-center shrink-0",
+                                  "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
                                   hasValue ? "bg-primary text-background" : "bg-white/5 text-white/20"
                                 )}>
-                                  <IconComp size={18} strokeWidth={1.5} aria-hidden />
+                                  <IconComp size={16} strokeWidth={1.5} aria-hidden />
                                 </div>
                                 <div className="flex-1 min-w-0 space-y-1">
                                   <p id={`ritual-num-${rid}-label`} className="text-[10px] font-bold uppercase tracking-widest truncate">{ritual.label}</p>
@@ -198,21 +187,18 @@ export default function SanctuaryPage() {
                             aria-label={isActive ? `Mark ${ritual.label} as incomplete` : `Mark ${ritual.label} as complete`}
                             aria-pressed={isActive}
                             className={cn(
-                              "w-full luxury-blur p-5 rounded-[2rem] border transition-all duration-700 text-left flex items-center justify-between luxury-shadow",
-                              isActive ? "border-primary/40 bg-primary/5" : "border-white/5 opacity-40 hover:opacity-100"
+                              "w-full luxury-blur p-4 rounded-[2rem] border transition-all duration-700 text-left flex items-center justify-between",
+                              isActive ? "border-primary/30 bg-primary/5" : "border-white/5 opacity-40 hover:opacity-100"
                             )}
                           >
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-3">
                               <div className={cn(
-                                "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-700",
-                                isActive ? "bg-primary text-background shadow-[0_0_20px_rgba(212,175,55,0.4)]" : "bg-white/5 text-white/20"
+                                "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-700",
+                                isActive ? "bg-primary text-background" : "bg-white/5 text-white/20"
                               )}>
-                                <IconComp size={18} strokeWidth={1.5} />
+                                <IconComp size={16} strokeWidth={1.5} />
                               </div>
-                              <div className="space-y-0.5">
-                                <p className={cn("text-[10px] font-bold uppercase tracking-widest", isActive ? "text-primary gold-glow" : "opacity-40")}>{ritual.label}</p>
-                                <p className="text-[7px] font-medium opacity-20">{ritual.label}</p>
-                              </div>
+                              <p className={cn("text-[10px] font-bold uppercase tracking-widest", isActive ? "text-primary gold-glow" : "text-muted-foreground")}>{ritual.label}</p>
                             </div>
                             {isActive && <CheckCircle2 size={14} className="text-primary gold-glow" />}
                           </button>
@@ -224,17 +210,17 @@ export default function SanctuaryPage() {
 
                 <div className="space-y-6">
                   <div className="flex justify-between items-center px-2">
-                    <p className="text-[8px] font-black uppercase tracking-[0.8em] opacity-10 flex items-center gap-2">
+                    <p className="text-[8px] font-black uppercase tracking-[0.8em] text-muted-foreground flex items-center gap-2">
                       <Banknote size={12} /> Savings goals
                     </p>
-                    <Link href="/sanctuary/vault" className="p-2 opacity-30 hover:opacity-100 transition-all text-[8px] font-bold uppercase tracking-wider">
+                    <Link href="/sanctuary/vault" className="p-2 text-muted-foreground hover:text-foreground transition-all text-[8px] font-bold uppercase tracking-wider">
                       Vault
                     </Link>
                   </div>
 
                   {capitalMoneyGoals.length === 0 ? (
-                    <Link href="/sanctuary/vault" className="block p-10 text-center opacity-30 border border-dashed border-white/5 rounded-[2.5rem] hover:opacity-100 transition-all bg-white/[0.01]">
-                      <Banknote size={24} className="mx-auto mb-3 opacity-10" />
+                    <Link href="/sanctuary/vault" className="block p-10 text-center text-muted-foreground border border-dashed border-border dark:border-white/10 rounded-[2.5rem] hover:text-foreground hover:border-foreground/20 transition-all bg-muted/20 dark:bg-white/5">
+                      <Banknote size={24} className="mx-auto mb-3 opacity-60" />
                       <p className="text-[9px] font-black uppercase tracking-[0.6em]">No savings goals yet</p>
                       <p className="text-[8px] opacity-50 mt-1">Create one in the Vault</p>
                     </Link>
@@ -280,18 +266,22 @@ export default function SanctuaryPage() {
                 {capitalHoursGoals.length > 0 && alphaMandate && (
                   <div className="space-y-6">
                     <div className="flex justify-between items-center px-2">
-                      <p className="text-[8px] font-black uppercase tracking-[0.8em] opacity-10">Focus (hours)</p>
-                      <Link href="/sanctuary/vault" className="p-2 opacity-30 hover:opacity-100 transition-all">
+                      <p className="text-[8px] font-black uppercase tracking-[0.8em] text-muted-foreground">Focus (hours)</p>
+                      <Link href="/sanctuary/vault" className="p-2 text-muted-foreground hover:text-foreground transition-all">
                         <ArrowRight size={12} />
                       </Link>
                     </div>
                     <div className="luxury-blur p-6 rounded-[2.5rem] space-y-6 border border-white/5 luxury-shadow relative overflow-hidden bg-black/40">
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
-                          <h3 className="text-lg luxury-text">{alphaMandate.name}</h3>
+                          <h3 className="text-lg luxury-text">{alphaMandate.parentAssetId ? `Next step: ${alphaMandate.name}` : alphaMandate.name}</h3>
                           <span className="text-[6px] font-black uppercase px-2 py-0.5 rounded-full border border-primary/40 text-primary bg-primary/10">ALPHA</span>
                         </div>
-                        <p className="text-[8px] font-black uppercase tracking-[0.4em] opacity-20">{alphaMandate.targetHours}h Mandate</p>
+                        <p className="text-[8px] font-black uppercase tracking-[0.4em] opacity-20">
+                          {alphaMandate.parentAssetId
+                            ? (() => { const parent = assets.find(a => a.id === alphaMandate.parentAssetId); return parent ? `Step ${alphaMandate.stepOrder ?? '?'} of ${parent.name} · ${alphaMandate.targetHours}h` : `${alphaMandate.targetHours}h Mandate`; })()
+                            : `${alphaMandate.targetHours}h Mandate`}
+                        </p>
                       </div>
                       <div className="space-y-4">
                         <div className="flex justify-between items-end">
@@ -305,6 +295,31 @@ export default function SanctuaryPage() {
                           <div className={cn("h-full transition-all duration-1000", analytics?.status === 'critical' ? 'bg-destructive' : 'bg-primary gold-glow')} style={{ width: `${progress}%` }} />
                         </div>
                       </div>
+                      {alphaMandate.parentAssetId && (() => {
+                        const parent = assets.find(a => a.id === alphaMandate.parentAssetId);
+                        if (!parent) return null;
+                        const pathSteps = getChildrenOf(parent.id);
+                        if (pathSteps.length === 0) return null;
+                        return (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-white/5">
+                            {pathSteps.map((step) => {
+                              const isCurrent = step.id === alphaMandate.id;
+                              const isComplete = step.investedHours >= step.targetHours;
+                              return (
+                                <span
+                                  key={step.id}
+                                  className={cn(
+                                    "inline-flex items-center rounded-full px-2 py-0.5 text-[7px] font-black uppercase tracking-wider transition-all",
+                                    isCurrent ? "bg-primary/20 text-primary border border-primary/40" : isComplete ? "bg-white/10 opacity-60" : "opacity-40"
+                                  )}
+                                >
+                                  {isComplete ? '✓' : ''} Step {step.stepOrder ?? ''}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
                     </div>
                     <Link href="/today" className="block">
                       <button className="w-full h-14 rounded-full bg-primary text-background text-[10px] font-black uppercase tracking-[0.8em] luxury-shadow hover:scale-[1.01] active:scale-95 transition-all duration-500 gold-glow">
@@ -330,12 +345,12 @@ export default function SanctuaryPage() {
               <TabsContent key={pillar.id} value={pillar.id} className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
                 <div className="text-center space-y-1">
                   <h2 className="text-2xl luxury-text">Vitality</h2>
-                  <p className="text-[8px] font-bold uppercase tracking-[0.6em] opacity-20">Health & life goals</p>
+                  <p className="text-[8px] font-bold uppercase tracking-[0.6em] text-muted-foreground">Health & life goals</p>
                 </div>
 
                 {getPillarRituals(pillar.id).length > 0 && (
                   <div className="space-y-6">
-                    <p className="text-[8px] font-black uppercase tracking-[0.8em] opacity-10 px-2">Maintenance Protocol</p>
+                    <p className="text-[8px] font-black uppercase tracking-[0.8em] text-muted-foreground px-2">Maintenance Protocol</p>
                     <div className="grid gap-3">
                       {getPillarRituals(pillar.id).map(rid => {
                         const ritual = ritualById[rid];
@@ -346,10 +361,10 @@ export default function SanctuaryPage() {
                           const hasValue = value != null;
                           const hintId = `ritual-num-${rid}-hint`;
                           return (
-                            <div key={rid} role="group" aria-labelledby={`ritual-num-${rid}-label`} className={cn("w-full luxury-blur p-5 rounded-[2rem] border transition-all duration-700 luxury-shadow", hasValue ? "border-primary/40 bg-primary/5" : "border-white/5 opacity-80")}>
-                              <div className="flex items-center gap-4">
-                                <div className={cn("w-10 h-10 rounded-full flex items-center justify-center shrink-0", hasValue ? "bg-primary text-background" : "bg-white/5 text-white/20")}>
-                                  <IconComp size={18} strokeWidth={1.5} aria-hidden />
+                            <div key={rid} role="group" aria-labelledby={`ritual-num-${rid}-label`} className={cn("w-full luxury-blur p-4 rounded-[2rem] border transition-all duration-700", hasValue ? "border-primary/30 bg-primary/5" : "border-white/5 opacity-80")}>
+                              <div className="flex items-center gap-3">
+                                <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", hasValue ? "bg-primary text-background" : "bg-white/5 text-white/20")}>
+                                  <IconComp size={16} strokeWidth={1.5} aria-hidden />
                                 </div>
                                 <div className="flex-1 min-w-0 space-y-1">
                                   <p id={`ritual-num-${rid}-label`} className="text-[10px] font-bold uppercase tracking-widest truncate">{ritual.label}</p>
@@ -366,13 +381,10 @@ export default function SanctuaryPage() {
                         }
                         const isActive = !!vitals[rid];
                         return (
-                          <button key={rid} onClick={() => toggleVital(rid)} aria-label={isActive ? `Mark ${ritual.label} as incomplete` : `Mark ${ritual.label} as complete`} aria-pressed={isActive} className={cn("w-full luxury-blur p-5 rounded-[2rem] border transition-all duration-700 text-left flex items-center justify-between luxury-shadow", isActive ? "border-primary/40 bg-primary/5" : "border-white/5 opacity-40 hover:opacity-100")}>
-                            <div className="flex items-center gap-4">
-                              <div className={cn("w-10 h-10 rounded-full flex items-center justify-center transition-all duration-700", isActive ? "bg-primary text-background shadow-[0_0_20px_rgba(212,175,55,0.4)]" : "bg-white/5 text-white/20")}><IconComp size={18} strokeWidth={1.5} /></div>
-                              <div className="space-y-0.5">
-                                <p className={cn("text-[10px] font-bold uppercase tracking-widest", isActive ? "text-primary gold-glow" : "opacity-40")}>{ritual.label}</p>
-                                <p className="text-[7px] font-medium opacity-20">{ritual.label}</p>
-                              </div>
+                          <button key={rid} onClick={() => toggleVital(rid)} aria-label={isActive ? `Mark ${ritual.label} as incomplete` : `Mark ${ritual.label} as complete`} aria-pressed={isActive} className={cn("w-full luxury-blur p-4 rounded-[2rem] border transition-all duration-700 text-left flex items-center justify-between", isActive ? "border-primary/30 bg-primary/5" : "border-white/5 opacity-40 hover:opacity-100")}>
+                            <div className="flex items-center gap-3">
+                              <div className={cn("w-8 h-8 rounded-full flex items-center justify-center transition-all duration-700", isActive ? "bg-primary text-background" : "bg-white/5 text-white/20")}><IconComp size={16} strokeWidth={1.5} /></div>
+                              <p className={cn("text-[10px] font-bold uppercase tracking-widest", isActive ? "text-primary gold-glow" : "text-muted-foreground")}>{ritual.label}</p>
                             </div>
                             {isActive && <CheckCircle2 size={14} className="text-primary gold-glow" />}
                           </button>
@@ -384,17 +396,17 @@ export default function SanctuaryPage() {
 
                 <div className="space-y-6">
                   <div className="flex justify-between items-center px-2">
-                    <p className="text-[8px] font-black uppercase tracking-[0.8em] opacity-10 flex items-center gap-2">
+                    <p className="text-[8px] font-black uppercase tracking-[0.8em] text-muted-foreground flex items-center gap-2">
                       <Banknote size={12} /> Money goals
                     </p>
-                    <Link href="/sanctuary/vault" className="p-2 opacity-30 hover:opacity-100 transition-all text-[8px] font-bold uppercase tracking-wider">
+                    <Link href="/sanctuary/vault" className="p-2 text-muted-foreground hover:text-foreground transition-all text-[8px] font-bold uppercase tracking-wider">
                       Vault
                     </Link>
                   </div>
 
                   {vitalityMoneyGoals.length === 0 ? (
-                    <Link href="/sanctuary/vault" className="block p-10 text-center opacity-30 border border-dashed border-white/5 rounded-[2.5rem] hover:opacity-100 transition-all bg-white/[0.01]">
-                      <Banknote size={24} className="mx-auto mb-3 opacity-10" />
+                    <Link href="/sanctuary/vault" className="block p-10 text-center text-muted-foreground border border-dashed border-border dark:border-white/10 rounded-[2.5rem] hover:text-foreground transition-all bg-muted/20 dark:bg-white/5">
+                      <Banknote size={24} className="mx-auto mb-3 opacity-60" />
                       <p className="text-[9px] font-black uppercase tracking-[0.6em]">No money goals yet</p>
                       <p className="text-[8px] opacity-50 mt-1">e.g. dentist, medical procedure — create in Vault</p>
                     </Link>
@@ -440,18 +452,22 @@ export default function SanctuaryPage() {
                 {vitalityHoursGoals.length > 0 && alphaMandate && (
                   <div className="space-y-6">
                     <div className="flex justify-between items-center px-2">
-                      <p className="text-[8px] font-black uppercase tracking-[0.8em] opacity-10">Focus (hours)</p>
-                      <Link href="/sanctuary/vault" className="p-2 opacity-30 hover:opacity-100 transition-all">
+                      <p className="text-[8px] font-black uppercase tracking-[0.8em] text-muted-foreground">Focus (hours)</p>
+                      <Link href="/sanctuary/vault" className="p-2 text-muted-foreground hover:text-foreground transition-all">
                         <ArrowRight size={12} />
                       </Link>
                     </div>
                     <div className="luxury-blur p-6 rounded-[2.5rem] space-y-6 border border-white/5 luxury-shadow relative overflow-hidden bg-black/40">
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
-                          <h3 className="text-lg luxury-text">{alphaMandate.name}</h3>
+                          <h3 className="text-lg luxury-text">{alphaMandate.parentAssetId ? `Next step: ${alphaMandate.name}` : alphaMandate.name}</h3>
                           <span className="text-[6px] font-black uppercase px-2 py-0.5 rounded-full border border-primary/40 text-primary bg-primary/10">ALPHA</span>
                         </div>
-                        <p className="text-[8px] font-black uppercase tracking-[0.4em] opacity-20">{alphaMandate.targetHours}h Mandate</p>
+                        <p className="text-[8px] font-black uppercase tracking-[0.4em] opacity-20">
+                          {alphaMandate.parentAssetId
+                            ? (() => { const parent = assets.find(a => a.id === alphaMandate.parentAssetId); return parent ? `Step ${alphaMandate.stepOrder ?? '?'} of ${parent.name} · ${alphaMandate.targetHours}h` : `${alphaMandate.targetHours}h Mandate`; })()
+                            : `${alphaMandate.targetHours}h Mandate`}
+                        </p>
                       </div>
                       <div className="space-y-4">
                         <div className="flex justify-between items-end">
@@ -465,6 +481,31 @@ export default function SanctuaryPage() {
                           <div className={cn("h-full transition-all duration-1000", analytics?.status === 'critical' ? 'bg-destructive' : 'bg-primary gold-glow')} style={{ width: `${progress}%` }} />
                         </div>
                       </div>
+                      {alphaMandate.parentAssetId && (() => {
+                        const parent = assets.find(a => a.id === alphaMandate.parentAssetId);
+                        if (!parent) return null;
+                        const pathSteps = getChildrenOf(parent.id);
+                        if (pathSteps.length === 0) return null;
+                        return (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-white/5">
+                            {pathSteps.map((step) => {
+                              const isCurrent = step.id === alphaMandate.id;
+                              const isComplete = step.investedHours >= step.targetHours;
+                              return (
+                                <span
+                                  key={step.id}
+                                  className={cn(
+                                    "inline-flex items-center rounded-full px-2 py-0.5 text-[7px] font-black uppercase tracking-wider transition-all",
+                                    isCurrent ? "bg-primary/20 text-primary border border-primary/40" : isComplete ? "bg-white/10 opacity-60" : "opacity-40"
+                                  )}
+                                >
+                                  {isComplete ? '✓' : ''} Step {step.stepOrder ?? ''}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
                     </div>
                     <Link href="/today" className="block">
                       <button className="w-full h-14 rounded-full bg-primary text-background text-[10px] font-black uppercase tracking-[0.8em] luxury-shadow hover:scale-[1.01] active:scale-95 transition-all duration-500 gold-glow">
@@ -476,7 +517,7 @@ export default function SanctuaryPage() {
 
                 {assets.filter(a => a.category === 'vitality' && a.linkedCapitalAssetId).length > 0 && (
                   <div className="space-y-4">
-                    <p className="text-[8px] font-black uppercase tracking-[0.8em] opacity-10 px-2 flex items-center gap-2">
+                    <p className="text-[8px] font-black uppercase tracking-[0.8em] text-muted-foreground px-2 flex items-center gap-2">
                       <Banknote size={12} /> Funding (Capital sub-goals)
                     </p>
                     {assets.filter(a => a.category === 'vitality' && a.linkedCapitalAssetId).map((source) => {
@@ -520,12 +561,12 @@ export default function SanctuaryPage() {
             <TabsContent key={pillar.id} value={pillar.id} className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
               <div className="text-center space-y-1">
                 <h2 className="text-2xl luxury-text">{pillar.label}</h2>
-                <p className="text-[8px] font-bold uppercase tracking-[0.6em] opacity-20">{pillar.description}</p>
+                <p className="text-[8px] font-bold uppercase tracking-[0.6em] text-muted-foreground">{pillar.description}</p>
               </div>
 
               {getPillarRituals(pillar.id).length > 0 && (
                 <div className="space-y-6">
-                  <p className="text-[8px] font-black uppercase tracking-[0.8em] opacity-10 px-2">Maintenance Protocol</p>
+                  <p className="text-[8px] font-black uppercase tracking-[0.8em] text-muted-foreground px-2">Maintenance Protocol</p>
                   <div className="grid gap-3">
                     {getPillarRituals(pillar.id).map(rid => {
                       const ritual = ritualById[rid];
@@ -536,9 +577,9 @@ export default function SanctuaryPage() {
                         const hasValue = value != null;
                         const hintId = `ritual-num-${rid}-hint`;
                         return (
-                          <div key={rid} role="group" aria-labelledby={`ritual-num-${rid}-label`} className={cn("w-full luxury-blur p-5 rounded-[2rem] border transition-all duration-700 luxury-shadow", hasValue ? "border-primary/40 bg-primary/5" : "border-white/5 opacity-80")}>
-                            <div className="flex items-center gap-4">
-                              <div className={cn("w-10 h-10 rounded-full flex items-center justify-center shrink-0", hasValue ? "bg-primary text-background" : "bg-white/5 text-white/20")}><IconComp size={18} strokeWidth={1.5} aria-hidden /></div>
+                          <div key={rid} role="group" aria-labelledby={`ritual-num-${rid}-label`} className={cn("w-full luxury-blur p-4 rounded-[2rem] border transition-all duration-700", hasValue ? "border-primary/30 bg-primary/5" : "border-white/5 opacity-80")}>
+                            <div className="flex items-center gap-3">
+                              <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", hasValue ? "bg-primary text-background" : "bg-white/5 text-white/20")}><IconComp size={16} strokeWidth={1.5} aria-hidden /></div>
                               <div className="flex-1 min-w-0 space-y-1">
                                 <p id={`ritual-num-${rid}-label`} className="text-[10px] font-bold uppercase tracking-widest truncate">{ritual.label}</p>
                                 <div className="flex items-center gap-2 flex-wrap">
@@ -554,13 +595,10 @@ export default function SanctuaryPage() {
                       }
                       const isActive = !!vitals[rid];
                       return (
-                        <button key={rid} onClick={() => toggleVital(rid)} aria-label={isActive ? `Mark ${ritual.label} as incomplete` : `Mark ${ritual.label} as complete`} aria-pressed={isActive} className={cn("w-full luxury-blur p-5 rounded-[2rem] border transition-all duration-700 text-left flex items-center justify-between luxury-shadow", isActive ? "border-primary/40 bg-primary/5" : "border-white/5 opacity-40 hover:opacity-100")}>
-                          <div className="flex items-center gap-4">
-                            <div className={cn("w-10 h-10 rounded-full flex items-center justify-center transition-all duration-700", isActive ? "bg-primary text-background shadow-[0_0_20px_rgba(212,175,55,0.4)]" : "bg-white/5 text-white/20")}><IconComp size={18} strokeWidth={1.5} /></div>
-                            <div className="space-y-0.5">
-                              <p className={cn("text-[10px] font-bold uppercase tracking-widest", isActive ? "text-primary gold-glow" : "opacity-40")}>{ritual.label}</p>
-                              <p className="text-[7px] font-medium opacity-20">{ritual.label}</p>
-                            </div>
+                        <button key={rid} onClick={() => toggleVital(rid)} aria-label={isActive ? `Mark ${ritual.label} as incomplete` : `Mark ${ritual.label} as complete`} aria-pressed={isActive} className={cn("w-full luxury-blur p-4 rounded-[2rem] border transition-all duration-700 text-left flex items-center justify-between", isActive ? "border-primary/30 bg-primary/5" : "border-white/5 opacity-40 hover:opacity-100")}>
+                          <div className="flex items-center gap-3">
+                            <div className={cn("w-8 h-8 rounded-full flex items-center justify-center transition-all duration-700", isActive ? "bg-primary text-background" : "bg-white/5 text-white/20")}><IconComp size={16} strokeWidth={1.5} /></div>
+                            <p className={cn("text-[10px] font-bold uppercase tracking-widest", isActive ? "text-primary gold-glow" : "text-muted-foreground")}>{ritual.label}</p>
                           </div>
                           {isActive && <CheckCircle2 size={14} className="text-primary gold-glow" />}
                         </button>
@@ -572,15 +610,15 @@ export default function SanctuaryPage() {
 
               <div className="space-y-6">
                 <div className="flex justify-between items-center px-2">
-                  <p className="text-[8px] font-black uppercase tracking-[0.8em] opacity-10">Alpha Mandate</p>
-                  <Link href="/sanctuary/vault" className="p-2 opacity-30 hover:opacity-100 transition-all">
+                  <p className="text-[8px] font-black uppercase tracking-[0.8em] text-muted-foreground">Alpha Mandate</p>
+                  <Link href="/sanctuary/vault" className="p-2 text-muted-foreground hover:text-foreground transition-all">
                     <ArrowRight size={12} />
                   </Link>
                 </div>
 
                 {!alphaMandate && moneyGoals.length === 0 ? (
-                  <Link href="/sanctuary/vault" className="block p-10 text-center opacity-30 border border-dashed border-white/5 rounded-[2.5rem] hover:opacity-100 transition-all bg-white/[0.01]">
-                    <Focus size={24} className="mx-auto mb-3 opacity-10" />
+                  <Link href="/sanctuary/vault" className="block p-10 text-center text-muted-foreground border border-dashed border-border dark:border-white/10 rounded-[2.5rem] hover:text-foreground transition-all bg-muted/20 dark:bg-white/5">
+                    <Focus size={24} className="mx-auto mb-3 opacity-60" />
                     <p className="text-[9px] font-black uppercase tracking-[0.6em]">Establish Alpha</p>
                   </Link>
                 ) : !alphaMandate && moneyGoals.length > 0 ? (
@@ -619,10 +657,14 @@ export default function SanctuaryPage() {
                     <div className="luxury-blur p-6 rounded-[2.5rem] space-y-6 border border-white/5 luxury-shadow relative overflow-hidden bg-black/40">
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
-                          <h3 className="text-lg luxury-text">{alphaMandate.name}</h3>
+                          <h3 className="text-lg luxury-text">{alphaMandate.parentAssetId ? `Next step: ${alphaMandate.name}` : alphaMandate.name}</h3>
                           <span className="text-[6px] font-black uppercase px-2 py-0.5 rounded-full border border-primary/40 text-primary bg-primary/10">ALPHA</span>
                         </div>
-                        <p className="text-[8px] font-black uppercase tracking-[0.4em] opacity-20">{alphaMandate.targetHours}h Mandate</p>
+                        <p className="text-[8px] font-black uppercase tracking-[0.4em] opacity-20">
+                          {alphaMandate.parentAssetId
+                            ? (() => { const parent = assets.find(a => a.id === alphaMandate.parentAssetId); return parent ? `Step ${alphaMandate.stepOrder ?? '?'} of ${parent.name} · ${alphaMandate.targetHours}h` : `${alphaMandate.targetHours}h Mandate`; })()
+                            : `${alphaMandate.targetHours}h Mandate`}
+                        </p>
                       </div>
 
                       <div className="space-y-4">
@@ -648,6 +690,32 @@ export default function SanctuaryPage() {
                         </div>
                       </div>
 
+                      {alphaMandate.parentAssetId && (() => {
+                        const parent = assets.find(a => a.id === alphaMandate.parentAssetId);
+                        if (!parent) return null;
+                        const pathSteps = getChildrenOf(parent.id);
+                        if (pathSteps.length === 0) return null;
+                        return (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-white/5">
+                            {pathSteps.map((step) => {
+                              const isCurrent = step.id === alphaMandate.id;
+                              const isComplete = step.investedHours >= step.targetHours;
+                              return (
+                                <span
+                                  key={step.id}
+                                  className={cn(
+                                    "inline-flex items-center rounded-full px-2 py-0.5 text-[7px] font-black uppercase tracking-wider transition-all",
+                                    isCurrent ? "bg-primary/20 text-primary border border-primary/40" : isComplete ? "bg-white/10 opacity-60" : "opacity-40"
+                                  )}
+                                >
+                                  {isComplete ? '✓' : ''} Step {step.stepOrder ?? ''}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+
                       <div className="pt-1 flex justify-between items-center text-[7px] font-black uppercase tracking-[0.5em] opacity-30">
                         <span>Urgency: {(analytics?.urgencyFactor || 0).toFixed(2)}x</span>
                         <span>{analytics?.dailyRequired.toFixed(1)}h Required</span>
@@ -664,7 +732,7 @@ export default function SanctuaryPage() {
 
                 {assets.filter(a => a.category === pillar.id && a.linkedCapitalAssetId).length > 0 && (
                   <div className="space-y-4">
-                    <p className="text-[8px] font-black uppercase tracking-[0.8em] opacity-10 px-2 flex items-center gap-2">
+                    <p className="text-[8px] font-black uppercase tracking-[0.8em] text-muted-foreground px-2 flex items-center gap-2">
                       <Banknote size={12} /> Funding (Capital sub-goals)
                     </p>
                     {assets.filter(a => a.category === pillar.id && a.linkedCapitalAssetId).map((source) => {
